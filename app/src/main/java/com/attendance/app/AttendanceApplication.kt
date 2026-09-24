@@ -6,8 +6,14 @@ import com.attendance.app.data.repository.AttendanceRepository
 import com.attendance.app.location.LocationHelper
 import com.attendance.app.ml.FaceDetectorHelper
 import com.attendance.app.ml.FaceNetModelHelper
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.launch
 
 class AttendanceApplication : Application() {
+
+    private val applicationScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
     lateinit var database: AppDatabase
         private set
@@ -29,10 +35,20 @@ class AttendanceApplication : Application() {
         instance = this
 
         database = AppDatabase.getInstance(this)
-        repository = AttendanceRepository(database.staffDao(), database.attendanceDao(), this)
+        repository = AttendanceRepository(
+            staffDao = database.staffDao(),
+            attendanceDao = database.attendanceDao(),
+            adminUserDao = database.adminUserDao(),
+            context = this
+        )
         faceNetHelper = FaceNetModelHelper(this)
         faceDetectorHelper = FaceDetectorHelper()
         locationHelper = LocationHelper(this)
+
+        // Seed default demo accounts on first launch
+        applicationScope.launch {
+            repository.seedDatabaseIfNeeded()
+        }
     }
 
     companion object {

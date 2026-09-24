@@ -96,12 +96,28 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     private val _selectedStaffRecords = MutableStateFlow<List<AttendanceRecord>>(emptyList())
     val selectedStaffRecords: StateFlow<List<AttendanceRecord>> = _selectedStaffRecords.asStateFlow()
 
+    // Logged in staff (if authenticated as specific staff member)
+    private val _loggedInStaff = MutableStateFlow<Staff?>(null)
+    val loggedInStaff: StateFlow<Staff?> = _loggedInStaff.asStateFlow()
+
+    init {
+        viewModelScope.launch {
+            repository.seedDatabaseIfNeeded()
+        }
+    }
+
     fun login(role: UserRole) {
         _currentUserRole.value = role
     }
 
+    fun loginStaff(staff: Staff?) {
+        _currentUserRole.value = UserRole.STAFF
+        _loggedInStaff.value = staff
+    }
+
     fun logout() {
         _currentUserRole.value = UserRole.NONE
+        _loggedInStaff.value = null
         resetStates()
     }
 

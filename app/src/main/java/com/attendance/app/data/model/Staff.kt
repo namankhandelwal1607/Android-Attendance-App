@@ -13,17 +13,23 @@ data class Staff(
     val id: Long = 0,
     val name: String,
     val employeeId: String,
-    val faceEmbedding: String, // Comma-separated float values of 192-d vector
+    val faceEmbedding: String? = null, // Comma-separated float values of 192-d vector; null until face enrolled
     val photoPath: String? = null,
-    val enrolledAt: Long = System.currentTimeMillis()
+    val enrolledAt: Long = System.currentTimeMillis(),
+    val username: String = "",
+    val password: String = ""
 ) {
     fun getEmbeddingArray(): FloatArray {
-        return if (faceEmbedding.isBlank()) {
+        val embedding = faceEmbedding
+        return if (embedding.isNullOrBlank()) {
             FloatArray(0)
         } else {
-            faceEmbedding.split(",").mapNotNull { it.trim().toFloatOrNull() }.toFloatArray()
+            embedding.split(",").mapNotNull { it.trim().toFloatOrNull() }.toFloatArray()
         }
     }
+
+    val isFaceEnrolled: Boolean
+        get() = !faceEmbedding.isNullOrBlank()
 
     companion object {
         fun embeddingToString(array: FloatArray): String {

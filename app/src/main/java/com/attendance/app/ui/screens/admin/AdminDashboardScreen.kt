@@ -588,11 +588,28 @@ fun DirectoryStaffCard(
 
                 Spacer(modifier = Modifier.height(2.dp))
 
-                Text(
-                    text = "ID: ${staff.employeeId}",
-                    fontSize = 12.sp,
-                    color = Slate500
-                )
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        text = "ID: ${staff.employeeId}",
+                        fontSize = 12.sp,
+                        color = Slate500
+                    )
+                    if (!staff.isFaceEnrolled) {
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Surface(
+                            shape = RoundedCornerShape(4.dp),
+                            color = AmberLight
+                        ) {
+                            Text(
+                                text = "Face Pending",
+                                fontSize = 10.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                color = AmberWarning,
+                                modifier = Modifier.padding(horizontal = 5.dp, vertical = 1.dp)
+                            )
+                        }
+                    }
+                }
 
                 Spacer(modifier = Modifier.height(6.dp))
 

@@ -23,7 +23,7 @@ fun AppNavHost(
     ) {
         composable(Screen.Login.route) {
             LoginScreen(
-                viewModel = viewModel,
+                appViewModel = viewModel,
                 onNavigateToAdmin = {
                     navController.navigate(Screen.AdminDashboard.route)
                 },

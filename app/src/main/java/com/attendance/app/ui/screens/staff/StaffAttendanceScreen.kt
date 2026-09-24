@@ -87,9 +87,13 @@ fun StaffAttendanceScreen(
         }
     }
 
-    // Auto-select first staff if available
-    LaunchedEffect(staffList) {
-        if (selectedStaff == null && staffList.isNotEmpty()) {
+    val loggedInStaff by viewModel.loggedInStaff.collectAsStateWithLifecycle()
+
+    // Auto-select logged-in staff if available, else first staff
+    LaunchedEffect(staffList, loggedInStaff) {
+        if (loggedInStaff != null) {
+            selectedStaff = staffList.find { it.id == loggedInStaff?.id } ?: loggedInStaff
+        } else if (selectedStaff == null && staffList.isNotEmpty()) {
             selectedStaff = staffList.first()
         }
     }
@@ -278,8 +282,11 @@ fun StaffAttendanceScreen(
                                     }
                                     Spacer(modifier = Modifier.width(12.dp))
                                     Column {
-                                        Text(staff.name, fontWeight = FontWeight.Bold, fontSize = 15.sp, color = Slate900)
-                                        Text("Enrolled face active • Ready for scan", fontSize = 12.sp, color = EmeraldDark)
+                                        if (staff.isFaceEnrolled) {
+                                            Text("Enrolled face active • Ready for scan", fontSize = 12.sp, color = EmeraldDark)
+                                        } else {
+                                            Text("Face not enrolled • Admin must enrol face first", fontSize = 12.sp, color = AmberWarning)
+                                        }
                                     }
                                 }
                             }

@@ -2,8 +2,10 @@ package com.attendance.app.data.repository
 
 import android.content.Context
 import android.graphics.Bitmap
+import com.attendance.app.data.local.AdminUserDao
 import com.attendance.app.data.local.AttendanceDao
 import com.attendance.app.data.local.StaffDao
+import com.attendance.app.data.model.AdminUser
 import com.attendance.app.data.model.AttendanceRecord
 import com.attendance.app.data.model.Staff
 import kotlinx.coroutines.Dispatchers
@@ -16,6 +18,7 @@ import java.util.Calendar
 class AttendanceRepository(
     private val staffDao: StaffDao,
     private val attendanceDao: AttendanceDao,
+    private val adminUserDao: AdminUserDao,
     private val context: Context
 ) {
     val allStaff: Flow<List<Staff>> = staffDao.getAllStaff()
@@ -54,6 +57,84 @@ class AttendanceRepository(
         staffDao.getStaffByEmployeeId(empId)
     }
 
+    suspend fun authenticateAdmin(username: String, pass: String): Boolean = withContext(Dispatchers.IO) {
+        if (username.equals("admin", ignoreCase = true) && pass == "admin123") {
+            return@withContext true
+        }
+        adminUserDao.authenticateAdmin(username, pass) != null
+    }
+
+    suspend fun authenticateStaff(query: String, pass: String): Staff? = withContext(Dispatchers.IO) {
+        // Fallback generic staff account
+        if (query.equals("staff", ignoreCase = true) && pass == "staff123") {
+            return@withContext staffDao.getStaffByUsername("staff") ?: Staff(
+                name = "Staff Member",
+                employeeId = "STAFF-000",
+                username = "staff",
+                password = "staff123"
+            )
+        }
+        staffDao.authenticateStaff(query, pass)
+    }
+
+    suspend fun seedDatabaseIfNeeded() = withContext(Dispatchers.IO) {
+        // 1. Seed Admin user if missing
+        if (adminUserDao.getAdminCount() == 0) {
+            adminUserDao.insertAdmin(AdminUser(username = "admin", password = "admin123"))
+        }
+
+        // 2. Seed 5 demo staff members without enrolled faces
+        val defaultStaff = listOf(
+            Staff(
+                name = "Rohan Sharma",
+                employeeId = "EMP-101",
+                username = "rohan",
+                password = "rohan123",
+                faceEmbedding = null,
+                photoPath = null
+            ),
+            Staff(
+                name = "Priya Verma",
+                employeeId = "EMP-102",
+                username = "priya",
+                password = "priya123",
+                faceEmbedding = null,
+                photoPath = null
+            ),
+            Staff(
+                name = "Aman Gupta",
+                employeeId = "EMP-103",
+                username = "aman",
+                password = "aman123",
+                faceEmbedding = null,
+                photoPath = null
+            ),
+            Staff(
+                name = "Sneha Iyer",
+                employeeId = "EMP-104",
+                username = "sneha",
+                password = "sneha123",
+                faceEmbedding = null,
+                photoPath = null
+            ),
+            Staff(
+                name = "Karan Mehta",
+                employeeId = "EMP-105",
+                username = "karan",
+                password = "karan123",
+                faceEmbedding = null,
+                photoPath = null
+            )
+        )
+
+        for (item in defaultStaff) {
+            val existing = staffDao.getStaffByEmployeeId(item.employeeId)
+            if (existing == null) {
+                staffDao.insertStaff(item)
+            }
+        }
+    }
+
     suspend fun enrollStaff(
         name: String,
         employeeId: String,
@@ -61,17 +142,26 @@ class AttendanceRepository(
         photoBitmap: Bitmap
     ): Result<Long> = withContext(Dispatchers.IO) {
         try {
-            val existing = staffDao.getStaffByEmployeeId(employeeId)
+            val existing = staffDao.getStaffByEmployeeId(employeeId.trim())
+            val photoPath = saveBitmapToFile(photoBitmap, "staff_${employeeId.trim()}_${System.currentTimeMillis()}.jpg")
+            val embeddingStr = Staff.embeddingToString(faceEmbedding)
+
             if (existing != null) {
-                return@withContext Result.failure(Exception("Employee ID '$employeeId' already exists"))
+                // Update existing record (e.g. seeded user enrolling face for the first time)
+                val updated = existing.copy(
+                    name = if (name.isNotBlank()) name.trim() else existing.name,
+                    faceEmbedding = embeddingStr,
+                    photoPath = photoPath,
+                    enrolledAt = System.currentTimeMillis()
+                )
+                staffDao.updateStaff(updated)
+                return@withContext Result.success(updated.id)
             }
 
-            // Save photo to app private storage
-            val photoPath = saveBitmapToFile(photoBitmap, "staff_${employeeId}_${System.currentTimeMillis()}.jpg")
             val staff = Staff(
                 name = name.trim(),
                 employeeId = employeeId.trim(),
-                faceEmbedding = Staff.embeddingToString(faceEmbedding),
+                faceEmbedding = embeddingStr,
                 photoPath = photoPath
             )
             val id = staffDao.insertStaff(staff)

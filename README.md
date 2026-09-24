@@ -70,27 +70,42 @@ adb install AttendanceApp.apk
 
 ## 🔑 Demo Credentials & Quick Test Guide
 
-### 1. Login Screen
-- The login screen provides two one-tap entry points:
-  - **Admin Portal**: Tap **"Admin Portal"** to manage staff and enrol faces.
-  - **Staff Attendance**: Tap **"Staff Attendance"** to mark attendance via face verification.
+### 1. Login Accounts & Seeded Demo Data
+
+The app includes a dedicated login screen with Username/Employee-ID and Password authentication, verified locally against Room SQLite and fallback demo credentials.
+
+#### Pre-loaded Accounts:
+
+| Role | Name | Employee ID | Username | Password | Face Status |
+| :--- | :--- | :--- | :--- | :--- | :--- |
+| **Admin** | System Administrator | `ADM-001` | `admin` | `admin123` | Admin Portal Access |
+| **Staff** | Rohan Sharma | `EMP-101` | `rohan` | `rohan123` | Pending Enrolment |
+| **Staff** | Priya Verma | `EMP-102` | `priya` | `priya123` | Pending Enrolment |
+| **Staff** | Aman Gupta | `EMP-103` | `aman` | `aman123` | Pending Enrolment |
+| **Staff** | Sneha Iyer | `EMP-104` | `sneha` | `sneha123` | Pending Enrolment |
+| **Staff** | Karan Mehta | `EMP-105` | `karan` | `karan123` | Pending Enrolment |
+
+> **Important**: Staff faces must be enrolled by an Admin via the Admin Portal before attendance can be marked for them.
+
+#### Generic Fallback Credentials:
+- **Admin**: `username: admin` | `password: admin123` (Routes to Admin Portal)
+- **Staff**: `username: staff` | `password: staff123` (Routes to Staff Attendance)
 
 ### 2. Testing Flow
-1. **Enrol Staff (Admin)**:
-   - Open **Admin Portal** $\rightarrow$ tap **"+ Enrol Staff"**.
-   - Enter Name (e.g., `Alex Mercer`) and ID (e.g., `EMP-101`).
-   - Tap **"Capture Face Selfie"** $\rightarrow$ grant camera permission $\rightarrow$ position your face inside the green guide oval $\rightarrow$ press the capture shutter button.
-   - Tap **"Save & Enrol Staff Member"**.
-2. **Mark Attendance (Staff)**:
-   - Return to the Home screen and open **"Staff Attendance"**.
-   - Select your profile (`Alex Mercer`).
-   - Tap **"Open Camera to Mark Attendance"** $\rightarrow$ grant location/camera permissions.
-   - Look directly into the camera and capture a selfie.
-   - **Verification**: The app computes the cosine similarity against the enrolled face.
-     - **Match**: Shows a green success confirmation, match confidence % (e.g. 94%), current timestamp, GPS coordinates, and street address.
-     - **Mismatch**: If a different person tries to mark attendance, the app rejects it with an error badge and does not record attendance.
-3. **Verify Profile & Logs**:
-   - Go back to **Admin Portal** $\rightarrow$ tap on the staff member's card to view their profile, enrolled picture, and detailed attendance log entries.
+1. **Admin Login & Face Enrolment**:
+   - Sign in with `username: admin` / `password: admin123`.
+   - In the **Admin Dashboard**, open the **Staff Directory** tab to view the 5 pre-loaded staff members (showing *Face Pending*).
+   - Tap **"+ Enrol Staff"**, enter an employee's details (e.g. `Rohan Sharma` and `EMP-101`), capture a face selfie inside the oval guide, and tap **"Save & Enrol Staff Member"**.
+   - The employee's record is immediately updated with their 192-d facial embedding.
+2. **Staff Login & Attendance Verification**:
+   - Log out from Admin and sign in as `rohan` / `rohan123` (or any enrolled staff member).
+   - The app automatically routes to **Staff Attendance** with Rohan selected.
+   - Tap **"Open Camera & Check In"** $\rightarrow$ look directly into the camera.
+   - **Verification**: The app computes cosine similarity on-device:
+     - **Match (≥70%)**: Confirms attendance with green badge, confidence %, timestamp, and reverse-geocoded GPS street address.
+     - **Mismatch / Unenrolled**: Prompts an error badge without recording attendance.
+3. **Review Attendance Logs**:
+   - Log back in as Admin $\rightarrow$ check **"Who is Present"** tab to see live attendance entries with captured selfies and locations.
 
 ---
 

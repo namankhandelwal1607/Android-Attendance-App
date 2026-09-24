@@ -4,17 +4,19 @@ import android.content.Context
 import androidx.room.Database
 import androidx.room.Room
 import androidx.room.RoomDatabase
+import com.attendance.app.data.model.AdminUser
 import com.attendance.app.data.model.AttendanceRecord
 import com.attendance.app.data.model.Staff
 
 @Database(
-    entities = [Staff::class, AttendanceRecord::class],
-    version = 1,
+    entities = [Staff::class, AttendanceRecord::class, AdminUser::class],
+    version = 2,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
     abstract fun staffDao(): StaffDao
     abstract fun attendanceDao(): AttendanceDao
+    abstract fun adminUserDao(): AdminUserDao
 
     companion object {
         @Volatile
@@ -26,7 +28,9 @@ abstract class AppDatabase : RoomDatabase() {
                     context.applicationContext,
                     AppDatabase::class.java,
                     "attendance_database.db"
-                ).fallbackToDestructiveMigration().build()
+                )
+                    .fallbackToDestructiveMigration()
+                    .build()
                 INSTANCE = instance
                 instance
             }
