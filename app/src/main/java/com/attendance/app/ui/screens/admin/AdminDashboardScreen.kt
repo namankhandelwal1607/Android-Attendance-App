@@ -22,8 +22,13 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.withStyle
+import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -568,11 +573,11 @@ fun AdminDashboardScreen(
                                         color = PrimaryBlueLight,
                                         border = BorderStroke(1.dp, PrimaryBlue.copy(alpha = 0.2f))
                                     ) {
-                                        Text(
+                                        MarkdownText(
                                             text = dailySummary!!.summaryMarkdown,
                                             fontSize = 13.sp,
                                             color = Slate800,
-                                            lineHeight = 18.sp,
+                                            lineHeight = 19.sp,
                                             modifier = Modifier.padding(12.dp)
                                         )
                                     }
@@ -689,7 +694,7 @@ fun AdminDashboardScreen(
                                     }
 
                                     Spacer(modifier = Modifier.height(6.dp))
-                                    Text(text = queryResult.aiAnswer, fontSize = 13.sp, color = Slate700, lineHeight = 18.sp)
+                                    MarkdownText(text = queryResult.aiAnswer, fontSize = 13.sp, color = Slate700, lineHeight = 19.sp)
 
                                     queryResult.structuredFilter?.let { filter ->
                                         Spacer(modifier = Modifier.height(8.dp))
@@ -721,8 +726,28 @@ fun AdminDashboardScreen(
                             }
                         }
 
-                        items(queryResult.matchingRecords) { record ->
-                            AdminAttendanceRecordCard(record = record)
+                        if (queryResult.matchingRecords.isEmpty()) {
+                            item {
+                                Surface(
+                                    modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
+                                    shape = RoundedCornerShape(10.dp),
+                                    color = Slate100,
+                                    border = BorderStroke(1.dp, Slate200)
+                                ) {
+                                    Row(
+                                        modifier = Modifier.padding(14.dp),
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Icon(Icons.Default.Info, contentDescription = null, tint = Slate500, modifier = Modifier.size(18.dp))
+                                        Spacer(modifier = Modifier.width(8.dp))
+                                        Text("No check-ins matched these criteria in the database.", fontSize = 13.sp, color = Slate600)
+                                    }
+                                }
+                            }
+                        } else {
+                            items(queryResult.matchingRecords) { record ->
+                                AdminAttendanceRecordCard(record = record)
+                            }
                         }
                     }
                 }
@@ -939,3 +964,53 @@ fun AdminAttendanceRecordCard(record: AttendanceRecord) {
         }
     }
 }
+
+@Composable
+fun MarkdownText(
+    text: String,
+    modifier: Modifier = Modifier,
+    color: Color = Slate800,
+    fontSize: TextUnit = 13.sp,
+    lineHeight: TextUnit = 19.sp,
+    fontWeight: FontWeight = FontWeight.Normal
+) {
+    val annotatedString = remember(text, color) {
+        buildAnnotatedString {
+            // Regex to match **bold** or *italic*
+            val pattern = Regex("""(\*\*(.*?)\*\*|\*(.*?)\*)""")
+            var lastIndex = 0
+            for (match in pattern.findAll(text)) {
+                val start = match.range.first
+                val end = match.range.last + 1
+                if (start > lastIndex) {
+                    append(text.substring(lastIndex, start))
+                }
+                val boldText = match.groups[2]?.value
+                val italicText = match.groups[3]?.value
+                if (boldText != null) {
+                    withStyle(SpanStyle(fontWeight = FontWeight.Bold, color = color)) {
+                        append(boldText)
+                    }
+                } else if (italicText != null) {
+                    withStyle(SpanStyle(fontStyle = FontStyle.Italic, color = color)) {
+                        append(italicText)
+                    }
+                }
+                lastIndex = end
+            }
+            if (lastIndex < text.length) {
+                append(text.substring(lastIndex))
+            }
+        }
+    }
+
+    Text(
+        text = annotatedString,
+        modifier = modifier,
+        color = color,
+        fontSize = fontSize,
+        lineHeight = lineHeight,
+        fontWeight = fontWeight
+    )
+}
+
