@@ -2,29 +2,56 @@ package com.attendance.app.ui.theme
 
 import androidx.compose.ui.graphics.Color
 
-// Professional Clean Palette (Slate & Blue)
-val PrimaryNavy = Color(0xFF1E3A8A)
-val PrimaryBlue = Color(0xFF2563EB)
-val PrimaryBlueLight = Color(0xFFEFF6FF)
-val PrimaryBlueHover = Color(0xFF1D4ED8)
+// Modern Green/White Palette (Matching Reference Screenshot)
+val ForestGreen = Color(0xFF1B3D33)
+val ForestGreenDark = Color(0xFF112922)
+val ForestGreenLight = Color(0xFFEAF4EE)
+val ForestGreenContainer = Color(0xFFD4E8DC)
+val AccentMint = Color(0xFF2E7D5B)
+val MintLight = Color(0xFFE0F2E9)
+val MintProgress = Color(0xFF81C784)
 
-val Slate900 = Color(0xFF0F172A)
-val Slate800 = Color(0xFF1E293B)
-val Slate700 = Color(0xFF334155)
-val Slate600 = Color(0xFF475569)
-val Slate500 = Color(0xFF64748B)
-val Slate400 = Color(0xFF94A3B8)
-val Slate300 = Color(0xFFCBD5E1)
-val Slate200 = Color(0xFFE2E8F0)
-val Slate100 = Color(0xFFF1F5F9)
-val Slate50 = Color(0xFFF8FAFC)
+val SoftOffWhite = Color(0xFFF7FAF8)
+val LightSage = Color(0xFFEFF5F1)
+val CardWhite = Color(0xFFFFFFFF)
 
-val EmeraldGreen = Color(0xFF16A34A)
-val EmeraldLight = Color(0xFFDCFCE7)
-val EmeraldDark = Color(0xFF15803D)
+// Forest-tinted Slates for clean, high-contrast typography
+val TextDark = Color(0xFF13221C)
+val TextMuted = Color(0xFF657D73)
+val ForestSlate900 = Color(0xFF13221C)
+val ForestSlate800 = Color(0xFF23352E)
+val ForestSlate700 = Color(0xFF374D44)
+val ForestSlate600 = Color(0xFF4E665C)
+val ForestSlate500 = Color(0xFF657D73)
+val ForestSlate400 = Color(0xFF8FA79E)
+val ForestSlate300 = Color(0xFFC2D3CB)
+val ForestSlate200 = Color(0xFFE1EBE5)
+val ForestSlate100 = Color(0xFFF0F5F2)
+val ForestSlate50 = Color(0xFFF7FAF8)
+
+// Compatibility aliases for existing UI code to immediately adapt theme
+val PrimaryBlue = ForestGreen
+val PrimaryNavy = ForestGreenDark
+val PrimaryBlueLight = ForestGreenLight
+val PrimaryBlueHover = ForestGreenDark
+
+val Slate900 = ForestSlate900
+val Slate800 = ForestSlate800
+val Slate700 = ForestSlate700
+val Slate600 = ForestSlate600
+val Slate500 = ForestSlate500
+val Slate400 = ForestSlate400
+val Slate300 = ForestSlate300
+val Slate200 = ForestSlate200
+val Slate100 = ForestSlate100
+val Slate50 = ForestSlate50
+
+val EmeraldGreen = AccentMint
+val EmeraldLight = MintLight
+val EmeraldDark = ForestGreen
 
 val AmberWarning = Color(0xFFD97706)
 val AmberLight = Color(0xFFFEF3C7)
 
-val RoseRed = Color(0xFFE11D48)
-val RoseLight = Color(0xFFFFE4E6)
+val RoseRed = Color(0xFFDC2626)
+val RoseLight = Color(0xFFFEE2E2)

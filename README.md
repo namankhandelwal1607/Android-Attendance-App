@@ -1,46 +1,96 @@
 # Smart Attendance App — 1:N Facial Kiosk, Admin Portal & Groq AI Assistant
 
-An enterprise-ready Android attendance system built with **Kotlin** and **Jetpack Compose**, featuring on-device **1:N Face Recognition** using TensorFlow Lite & Google ML Kit, **CameraX** live selfie capture, **GPS Geolocation** verification, local **Room SQLite** persistence, and an intelligent **Groq Llama-3.3 AI Assistant** for natural-language queries and executive summaries.
+An enterprise-ready Android attendance system built with **Kotlin** and **Jetpack Compose (Material 3)**, featuring a modern **Forest Green & Soft Off-White** UI, on-device **1:N Face Recognition** using TensorFlow Lite & Google ML Kit, **CameraX** live selfie capture, **GPS Geolocation** verification, **Check-In / Check-Out Hours Tracking**, local **Room SQLite** persistence, and an intelligent **Groq Cloud AI Assistant** (`openai/gpt-oss-20b` & `llama-3.3-70b`) for natural-language aggregate queries and executive summaries.
 
 ---
 
-## 📱 Core Features & Flow
+## 🎨 New UI Redesign (Forest Green & Soft White Palette)
 
-1. **Clean Initial State & Role-Based Access**:
-   - On a fresh installation, **zero pre-seeded staff exist**. Only one seeded Admin account exists:
-     - **Username**: `admin`
-     - **Password**: `admin123`
-   - All staff members must be explicitly registered and enrolled by an Admin.
+The app features a cohesive, elegant dark forest green design system:
+- **Palette**: Dark Forest Green (`#1B3D33`) as primary brand accent, Soft Off-White (`#F7FAF8`) background, Card White (`#FFFFFF`), and Mint accents (`#D9E8E1`).
+- **Screen 1 — Landing / Onboarding**:
+  - Shield + Clock + Checkmark brand logo.
+  - Heading *"Attendance Made Effortless"*.
+  - Prominent pill action: **"📷 Mark Attendance (Face Kiosk)"**.
+  - Collapsible portal sign-in card with quick-fill credentials for Admin (`admin` / `admin123`).
+- **Screen 2 — Live Clock & Concentric Ring Check-In / Out**:
+  - Greeting header: *"Hey [Staff Name]"*.
+  - Big live clock display (e.g. `09:00 AM`).
+  - Circular **concentric-ring button** with multi-layer pulsing waves for Check In and Check Out.
+  - Three real-time stat tiles: **Check in** time, **Check out** time, and **Total Hrs** worked.
+- **Screen 3 — Weekly Date Strip & Records**:
+  - Mon–Sun horizontal calendar strip with selected day highlight in Forest Green.
+  - Paired check-in and check-out rows with total hours calculation.
+  - Material 3 Calendar DatePicker & TimePicker range dialogs.
+- **Pill Bottom Navigation Bar & Centered Floating AI Assistant**:
+  - Floating pill navigation bar at the bottom.
+  - Center floating action button (FAB) with chat bubble / robot icon that opens the **Groq AI Assistant Sheet**.
 
-2. **Admin "Register Staff" with Mandatory Facial Enrolment**:
-   - Admin registers each employee with **Full Name** and **Employee ID**.
-   - Admin sets a password manually or taps **Auto-Generate** (e.g., `username = alice`, `password = 6-digit random code`) with credentials clearly displayed to hand to the employee.
-   - **Mandatory Face Enrolment**: Requires taking a front-camera selfie with an oval face-alignment guide. The app detects the face, normalizes it, and extracts a 192-dimensional embedding via MobileFaceNet before saving. Staff cannot be saved without an enrolled face.
+---
 
-3. **Kiosk "Mark Attendance" (No Login Required)**:
-   - Available directly on the landing screen via a prominent **"📷 Mark Attendance (Face Kiosk)"** button.
-   - Any staff member walks up to the kiosk, taps the button, and faces the camera.
-   - **True 1:N Face Identification**: The system computes on-device cosine similarity of the captured selfie against **all registered staff** simultaneously.
-   - **Threshold Security (≥ 0.70)**: If the highest similarity is $\ge 70\%$, the staff member is automatically identified and their attendance is marked with GPS coordinates, reverse-geocoded address, and timestamp.
-   - If no staff member matches $\ge 70\%$, an explicit error is displayed: *"Face not recognized — please contact Admin"*, and no record is logged.
+## ⏱️ Check-In / Check-Out & Total Hours Logic
 
-4. **Staff Portal (Self-Scoped & Read-Only)**:
-   - Staff sign in using their registered username/Employee ID and password.
-   - Purely self-scoped: staff view their own photo, Employee ID, check-in count, and read-only attendance history.
-   - Zero access to other employees' records, and no enrolment/administrative capabilities.
+1. **Daily Action Types**:
+   - `CHECK_IN`: Records staff arrival with selfie, timestamp, and GPS address.
+   - `CHECK_OUT`: Pairs with today's open check-in, records departure selfie, and calculates total hours worked:
+     $$\text{hoursWorked} = \frac{\text{checkOutTimestamp} - \text{checkInTimestamp}}{3{,}600{,}000}$$
+2. **Kiosk & Staff Flow Validation**:
+   - **Prevent Double Check-In**: A staff member who is already checked in cannot check in again today without checking out first.
+   - **Prevent Premature Check-Out**: A staff member cannot check out if they haven't checked in today.
+3. **Paired Attendance Presentation**:
+   - Both Admin and Staff screens display paired attendance blocks showing Check-In time, Check-Out time (or *"Pending"*), locations, thumbnails, and total formatted hours (e.g., `8h 15m`).
 
-5. **Admin Dashboard & Combinable Filters**:
-   - **All Staff Summary**: Total registered staff, per-staff check-in counts, and latest check-in timestamps.
-   - **Attendance Records Tab**: Filterable by:
-     - Specific Staff member (or all staff)
-     - Single Date or Date Range (Today, Last 7 Days, Custom range)
-     - Time-of-day window (e.g., 9:00 AM – 10:00 AM)
-     - All filters are dynamically combinable with a 1-tap "Clear All" reset.
+---
 
-6. **AI Admin Assistant (Groq Cloud)**:
-   - Natural language queries (e.g. *"Show me who was late today"*, *"Who checked in between 9 and 10 AM?"*, *"Did Alice check in this week?"*).
-   - Instant executive **Daily Attendance Summary & Anomaly Report** (punctuality, late arrivals, missing check-ins).
-   - Offline heuristic fallback ensures the app remains operational even without internet connectivity.
+## 🤖 Multi-Intent Groq AI Assistant Architecture
+
+To ensure **0% hallucination** on times, dates, and attendance counts, the AI Assistant uses a **Two-Step Architecture**:
+
+```
+┌──────────────────────────────────────────────────────────┐
+│                   User Asks Question                     │
+│       "Who checked in between 9 and 10 AM today?"         │
+└────────────────────────────┬─────────────────────────────┘
+                             │
+                             ▼
+┌──────────────────────────────────────────────────────────┐
+│              Step 1: Intent & Filter Parsing             │
+│        (Groq Cloud: openai/gpt-oss-20b JSON schema)       │
+│  Outputs: intent = "FILTER_RECORDS", timeFrom = "09:00",  │
+│           timeTo = "10:00", dateFrom = "2026-09-24"      │
+└────────────────────────────┬─────────────────────────────┘
+                             │
+                             ▼
+┌──────────────────────────────────────────────────────────┐
+│           Step 2: Local SQLite (Room) Execution          │
+│   Runs minute-based comparison & exact database counts.   │
+│   Verified result: 2 records (Alice at 09:12, Bob at 09:40)│
+└────────────────────────────┬─────────────────────────────┘
+                             │
+                             ▼
+┌──────────────────────────────────────────────────────────┐
+│              Step 3: Natural Language Response           │
+│   Sends verified numbers to Groq to phrase crisp answer. │
+│   "2 staff checked in: Alice (09:12 AM) & Bob (09:40 AM)"│
+└──────────────────────────────────────────────────────────┘
+```
+
+### Supported Intent Types:
+- `COUNT_STAFF`: *"How many staff are registered in the system?"*
+- `CURRENTLY_CHECKED_IN`: *"Who is currently checked in right now?"*
+- `CHECKED_OUT_TODAY`: *"Who has checked out today?"*
+- `HOURS_WORKED_TODAY`: *"How many hours did Alice work today?"*
+- `GENERAL_STATS`: *"Give me an attendance breakdown for today"*
+- `FILTER_RECORDS`: *"Show me check-ins between 9 and 10 AM"*
+- `CLARIFY`: Handles ambiguous queries (e.g. *"Show attendance"* without date/staff) by asking clarifying questions.
+
+### Sample Test Queries:
+1. `Who marked attendance today?`
+2. `Who checked in between 9 and 10 AM?`
+3. `How many staff are registered?`
+4. `Who is currently checked in?`
+5. `Show attendance for this week`
+6. `How many hours did Alice work today?`
 
 ---
 
@@ -48,109 +98,38 @@ An enterprise-ready Android attendance system built with **Kotlin** and **Jetpac
 
 | Role | Username | Password | Notes |
 | :--- | :--- | :--- | :--- |
-| **Admin** | `admin` | `admin123` | Full administrative access to dashboard, staff registration, and AI assistant. |
-| **Staff** | *Created by Admin* | *Set or generated at registration* | Read-only self-scoped portal. Can also log in using their Employee ID. |
+| **Admin** | `admin` | `admin123` | Full administrative dashboard, staff registration, and AI assistant. |
+| **Staff** | *Created by Admin* | *Set or generated at registration* | Self-scoped read-only portal with personal check-in/out and hours. |
 
 ---
 
-## 🎬 4-Step End-to-End Demo Script
+## 🎬 End-to-End Demo Script
 
-Follow this 4-step script to test the entire system end-to-end:
+### Step 1: Register a Staff Member
+1. Log in with Admin credentials (`admin` / `admin123`).
+2. Tap the **"+ Register Staff"** button.
+3. Enter Name: `Rohan Sharma`, Employee ID: `EMP-101`.
+4. Tap **"Auto-Generate"** to create a username and password.
+5. Capture a face selfie inside the oval guide and tap **"Complete Staff Registration"**.
 
-### Step 1: Register a Staff Member as Admin
-1. Open the app and log in with Admin credentials (`admin` / `admin123`).
-2. On the **All Staff** tab, tap the **"+ Register Staff"** button.
-3. Enter:
-   - **Full Name**: `Alice Smith`
-   - **Employee ID**: `EMP-201`
-4. Tap **"Auto-Generate"** to create a username (`alice`) and a 6-digit password (note them down).
-5. Tap **"Open Camera & Capture Face"** and capture a selfie within the oval guide.
-6. Tap **"Register & Enrol Staff"**. Alice is now registered with her facial embedding stored in Room SQLite.
+### Step 2: Mark Check-In via Face Kiosk
+1. Return to the landing screen and tap **"Mark Attendance (Face Kiosk)"**.
+2. Face the front camera and select **"Check In"**.
+3. Tap the **concentric-ring button** to verify face similarity ($\ge 70\%$).
+4. System greets: *"Checked in successfully!"* with timestamp and GPS address.
 
-### Step 2: Mark Attendance via Kiosk (No Login)
-1. Log out from the Admin portal to return to the landing screen.
-2. Tap the prominent blue **"Mark Attendance (Face Kiosk)"** button (no login needed).
-3. Face the front camera and tap **"Identify & Mark Attendance"**.
-4. The system runs 1:N cosine similarity against all enrolled staff, identifies **Alice Smith** with high confidence (e.g., 90%+ match), and records her attendance along with current GPS coordinates and street address.
+### Step 3: Mark Check-Out
+1. Return to the kiosk or log in to Staff Portal.
+2. Select **"Check Out"** and tap the concentric button.
+3. System records Check Out and calculates total hours worked.
 
-### Step 3: Verify Staff Read-Only History
-1. Return to the landing screen.
-2. Under "Sign In to Portal", enter Alice's credentials (`alice` and her 6-digit password).
-3. Alice's **"My Attendance"** screen opens, displaying her profile, Employee ID `EMP-201`, and the attendance record just marked in Step 2.
-4. Alice cannot see any other employee's records or perform administrative actions.
-5. Tap **"Log Out"** in the top bar.
-
-### Step 4: Admin Records Filter & AI Assistant
-1. Log back in as Admin (`admin` / `admin123`).
-2. Go to the **Records** tab $\rightarrow$ tap **"Filter Attendance Records"** $\rightarrow$ select `Alice Smith` to view Alice's filtered attendance.
-3. Switch to the **AI Assistant** tab:
-   - Tap **"Generate Daily Summary"** to get a 3–4 bullet executive briefing.
-   - Or type a query like: *"Show me Alice's attendance"* and tap **Ask AI**. The assistant extracts the filter, queries Room SQLite, and presents the matching records.
-
----
-
-## 🤖 AI Layer Architecture (Groq & FastMCP)
-
-```
-┌──────────────────────────────────────────────────────────┐
-│                     Jetpack Compose UI                   │
-│   (Admin Dashboard AI Tab / Search / Filter Controls)    │
-└────────────────────────────┬─────────────────────────────┘
-                             │
-                             ▼
-┌──────────────────────────────────────────────────────────┐
-│                  AppViewModel & Repository               │
-└──────────────┬────────────────────────────┬──────────────┘
-               │                            │
-               ▼                            ▼
-┌──────────────────────────────┐ ┌─────────────────────────┐
-│     AttendanceQueryAgent     │ │   Local Room Database   │
-│   (OkHttp 4.12.0 Client)     │ │   (Staff & Attendance)  │
-└──────────────┬───────────────┘ └──────────▲──────────────┘
-               │                            │
-               ▼                            │
-┌──────────────────────────────┐            │
-│       Groq Cloud API         │            │
-│  (llama-3.3-70b-versatile)   │            │
-│  OpenAI-compatible Endpoint  │            │
-└──────────────┬───────────────┘            │
-               │ Parses JSON structured     │
-               │ query filters              │
-               └────────────────────────────┘
-```
-
-### 1. Groq Integration
-- Uses OkHttp to communicate with the Groq OpenAI-compatible Chat Completions endpoint (`https://api.groq.com/openai/v1/chat/completions`).
-- Model: **`llama-3.3-70b-versatile`** with `response_format: { type: "json_object" }` for zero-shot natural language filter parsing.
-- Query Parsing Pipeline:
-  1. The user inputs a query in plain English (e.g. *"Who arrived after 10 AM yesterday?"*).
-  2. Groq extracts structured JSON: `staffName`, `dateFrom`, `dateTo`, `timeFrom`, `timeTo`.
-  3. The app executes this filter directly against Room SQLite database and returns verified records.
-- **Resilient Fallback**: If network is unavailable or Groq is unreachable, the query agent automatically switches to an offline heuristic parser so user queries never crash or fail silently.
-
-### 2. API Key Configuration
-The Groq API key is read at compile time from `local.properties` into `BuildConfig` and is **never committed to version control**:
-```properties
-# In local.properties (gitignored)
-GROQ_API_KEY=gsk_your_groq_api_key_here
-```
-In `app/build.gradle.kts`:
-```kotlin
-buildConfigField("String", "GROQ_API_KEY", "\"$groqApiKey\"")
-```
-
-### 3. FastMCP Server Stub (`mcp_server/attendance_mcp.py`)
-For external AI agent integrations (such as Anthropic Claude or custom MCP-compatible AI systems), a FastMCP server is provided under `mcp_server/attendance_mcp.py`.
-- **Tools exposed**:
-  - `get_staff()`: Retrieves registered staff members.
-  - `get_attendance(staff_id, date)`: Retrieves attendance records.
-  - `query_attendance_by_filter(staff_id, date_from, date_to, time_from, time_to)`: Runs combinable filters matching the Room SQLite data model.
-- Run using:
-  ```bash
-  cd mcp_server
-  pip install fastmcp
-  python attendance_mcp.py
-  ```
+### Step 4: Admin Portal & Floating AI Assistant
+1. Log back in as Admin.
+2. Navigate to **Records** to see the paired row (Check In + Check Out + Hours Worked).
+3. Use the **Weekly Date Strip** to filter records by any day of the week.
+4. Tap the **Center Robot/Chat FAB** to open the AI Assistant Sheet:
+   - Tap **"Generate"** under Daily Executive Summary.
+   - Or ask: *"Who checked in between 9 and 10 AM?"* or *"Who is currently checked in?"*.
 
 ---
 
@@ -158,34 +137,27 @@ For external AI agent integrations (such as Anthropic Claude or custom MCP-compa
 
 | Component | Technology | Description |
 | :--- | :--- | :--- |
-| **Language & UI** | Kotlin 1.9.24 + Jetpack Compose (Material 3) | Declarative reactive UI with StateFlow and Navigation Compose. |
-| **Camera** | AndroidX CameraX (`1.3.3`) | Lifecycle-aware front-facing camera selfie capture. |
+| **Language & UI** | Kotlin 1.9.24 + Jetpack Compose (Material 3) | Declarative UI matching the forest green design system. |
+| **Camera** | AndroidX CameraX (`1.3.3`) | Lifecycle-aware selfie capture with oval guidance. |
 | **Face Detection** | Google ML Kit Face Detection (`16.1.6`) | Fast bounding-box detection, face centering, and validation. |
 | **Face Recognition** | TensorFlow Lite (`2.14.0`) + MobileFaceNet | 192-d L2-normalized face embeddings compared via 1:N Cosine Similarity ($\ge 0.70$). |
-| **Database** | AndroidX Room (`2.6.1`) | Local SQLite persistence with schema migrations. |
+| **Database** | AndroidX Room (`2.6.1`) | Local SQLite persistence with paired check-in/check-out records & migrations. |
 | **Geolocation** | Google Play Services Location (`21.2.0`) | GPS coordinates (`FusedLocationProviderClient`) + Geocoder address lookup. |
-| **AI Layer** | Groq Cloud (`llama-3.3-70b-versatile`) + OkHttp | Natural-language query translation and automated daily executive summaries. |
-| **Image Loading** | Coil Compose (`2.6.0`) | High-performance image loading for selfie thumbnails and enrolled photos. |
+| **AI Layer** | Groq Cloud (`openai/gpt-oss-20b`, `llama-3.3-70b`) | Two-step query classification, Room query execution, and natural response phrasing. |
+| **Image Loading** | Coil Compose (`2.6.0`) | Image loading for selfie thumbnails and enrolled staff photos. |
 
 ---
 
 ## 🚀 Installation & Running
 
-### Option A: Install Pre-built APK via ADB (Quickest)
-Connect your Android phone via USB with USB Debugging enabled, then run:
+### Option A: Install via ADB on Connected Device
 ```bash
 adb install -r AttendanceApp.apk
-```
-Launch the app:
-```bash
 adb shell am start -n com.attendance.app/.MainActivity
 ```
 
 ### Option B: Build from Source
 ```bash
-# Build debug APK
 ./gradlew assembleDebug
-
-# Install on connected device
 adb install -r app/build/outputs/apk/debug/app-debug.apk
 ```

@@ -12,21 +12,21 @@ import androidx.compose.ui.platform.LocalView
 import androidx.core.view.WindowCompat
 
 private val LightColorScheme = lightColorScheme(
-    primary = PrimaryBlue,
+    primary = ForestGreen,
     onPrimary = Color.White,
-    primaryContainer = PrimaryBlueLight,
-    onPrimaryContainer = PrimaryNavy,
-    secondary = Slate800,
+    primaryContainer = ForestGreenLight,
+    onPrimaryContainer = ForestGreenDark,
+    secondary = AccentMint,
     onSecondary = Color.White,
-    secondaryContainer = Slate100,
-    onSecondaryContainer = Slate900,
-    background = Slate50,
-    onBackground = Slate900,
-    surface = Color.White,
-    onSurface = Slate900,
-    surfaceVariant = Slate100,
-    onSurfaceVariant = Slate700,
-    outline = Slate200,
+    secondaryContainer = ForestSlate100,
+    onSecondaryContainer = ForestSlate900,
+    background = SoftOffWhite,
+    onBackground = ForestSlate900,
+    surface = CardWhite,
+    onSurface = ForestSlate900,
+    surfaceVariant = ForestSlate100,
+    onSurfaceVariant = ForestSlate700,
+    outline = ForestSlate200,
     error = RoseRed,
     onError = Color.White,
     errorContainer = RoseLight,
@@ -43,7 +43,7 @@ fun AttendanceAppTheme(
     if (!view.isInEditMode) {
         SideEffect {
             val window = (view.context as Activity).window
-            window.statusBarColor = Color.White.toArgb()
+            window.statusBarColor = SoftOffWhite.toArgb()
             WindowCompat.getInsetsController(window, view).isAppearanceLightStatusBars = true
         }
     }

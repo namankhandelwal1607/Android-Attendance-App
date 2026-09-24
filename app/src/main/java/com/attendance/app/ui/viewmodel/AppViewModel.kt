@@ -11,8 +11,10 @@ import com.attendance.app.ai.DailySummaryResult
 import com.attendance.app.ai.GroqAttendanceQueryAgent
 import com.attendance.app.ai.StructuredFilter
 import com.attendance.app.data.model.AttendanceRecord
+import com.attendance.app.data.model.DailyAttendancePair
 import com.attendance.app.data.model.Staff
-import com.attendance.app.data.repository.KioskAttendanceResult
+import com.attendance.app.data.repository.KioskIdentificationState
+import com.attendance.app.data.repository.StaffAttendanceTodayStatus
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 
@@ -32,7 +34,7 @@ enum class UserRole {
 class AppViewModel(application: Application) : AndroidViewModel(application) {
 
     private val app = application as AttendanceApplication
-    private val repository = app.repository
+    val repository = app.repository
     private val faceNetHelper = app.faceNetHelper
     private val faceDetectorHelper = app.faceDetectorHelper
     private val locationHelper = app.locationHelper
@@ -44,7 +46,11 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     private val _loggedInStaff = MutableStateFlow<Staff?>(null)
     val loggedInStaff: StateFlow<Staff?> = _loggedInStaff.asStateFlow()
 
-    // Staff list & stats
+    // Staff today's attendance status (Check In vs Check Out readiness + hours)
+    private val _staffTodayStatus = MutableStateFlow<StaffAttendanceTodayStatus?>(null)
+    val staffTodayStatus: StateFlow<StaffAttendanceTodayStatus?> = _staffTodayStatus.asStateFlow()
+
+    // Data streams from Room
     val staffList: StateFlow<List<Staff>> = repository.allStaff.stateIn(
         scope = viewModelScope,
         started = SharingStarted.WhileSubscribed(5000),
@@ -57,16 +63,16 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         initialValue = 0
     )
 
-    val todayAttendanceCount: StateFlow<Int> = repository.getTodayAttendanceCount().stateIn(
-        scope = viewModelScope,
-        started = SharingStarted.WhileSubscribed(5000),
-        initialValue = 0
-    )
-
     val allAttendanceRecords: StateFlow<List<AttendanceRecord>> = repository.allRecords.stateIn(
         scope = viewModelScope,
         started = SharingStarted.WhileSubscribed(5000),
         initialValue = emptyList()
+    )
+
+    val todayAttendanceCount: StateFlow<Int> = repository.getTodayAttendanceCount().stateIn(
+        scope = viewModelScope,
+        started = SharingStarted.WhileSubscribed(5000),
+        initialValue = 0
     )
 
     val todayRecords: StateFlow<List<AttendanceRecord>> = repository.getTodayRecords().stateIn(
@@ -88,13 +94,22 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         initialValue = emptyList()
     )
 
+    // Staff self-scoped daily pairs (Check In + Check Out + Hours Worked)
+    val staffDailyPairs: StateFlow<List<DailyAttendancePair>> = staffHistoryRecords.map { records ->
+        repository.groupRecordsIntoDailyPairs(records)
+    }.stateIn(
+        scope = viewModelScope,
+        started = SharingStarted.WhileSubscribed(5000),
+        initialValue = emptyList()
+    )
+
     // Staff Registration state
     private val _registerState = MutableStateFlow<EnrollUiState>(EnrollUiState.Idle)
     val registerState: StateFlow<EnrollUiState> = _registerState.asStateFlow()
 
     // Kiosk 1:N Attendance state
-    private val _kioskState = MutableStateFlow<KioskAttendanceResult>(KioskAttendanceResult.Idle)
-    val kioskState: StateFlow<KioskAttendanceResult> = _kioskState.asStateFlow()
+    private val _kioskState = MutableStateFlow<KioskIdentificationState>(KioskIdentificationState.Idle)
+    val kioskState: StateFlow<KioskIdentificationState> = _kioskState.asStateFlow()
 
     // Selected staff for admin profile view
     private val _selectedStaff = MutableStateFlow<Staff?>(null)
@@ -103,12 +118,21 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     private val _selectedStaffRecords = MutableStateFlow<List<AttendanceRecord>>(emptyList())
     val selectedStaffRecords: StateFlow<List<AttendanceRecord>> = _selectedStaffRecords.asStateFlow()
 
+    val selectedStaffDailyPairs: StateFlow<List<DailyAttendancePair>> = _selectedStaffRecords.map { records ->
+        repository.groupRecordsIntoDailyPairs(records)
+    }.stateIn(
+        scope = viewModelScope,
+        started = SharingStarted.WhileSubscribed(5000),
+        initialValue = emptyList()
+    )
+
     // COMBINABLE FILTERS FOR ADMIN ATTENDANCE RECORDS
     val filterStaffId = MutableStateFlow<Long?>(null)
     val filterDateFrom = MutableStateFlow<String?>(null) // YYYY-MM-DD
     val filterDateTo = MutableStateFlow<String?>(null)   // YYYY-MM-DD
     val filterTimeFrom = MutableStateFlow<String?>(null) // HH:mm
     val filterTimeTo = MutableStateFlow<String?>(null)   // HH:mm
+    val filterEventType = MutableStateFlow<String>("EITHER") // EITHER, CHECK_IN, CHECK_OUT
 
     private val filterCriteria = combine(
         filterStaffId,
@@ -122,20 +146,31 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
             dateFrom = dateFrom,
             dateTo = dateTo,
             timeFrom = timeFrom,
-            timeTo = timeTo
+            timeTo = timeTo,
+            eventType = filterEventType.value
         ) to staffId
     }
 
     val filteredRecords: StateFlow<List<AttendanceRecord>> = combine(
         allAttendanceRecords,
-        filterCriteria
-    ) { records, (filter, staffId) ->
-        val filteredByAttributes = GroqAttendanceQueryAgent.applyFilter(records, filter)
+        filterCriteria,
+        filterEventType
+    ) { records, (filter, staffId), eventType ->
+        val effectiveFilter = filter.copy(eventType = eventType)
+        val filteredByAttributes = GroqAttendanceQueryAgent.applyFilter(records, effectiveFilter)
         if (staffId != null) {
             filteredByAttributes.filter { it.staffId == staffId }
         } else {
             filteredByAttributes
         }
+    }.stateIn(
+        scope = viewModelScope,
+        started = SharingStarted.WhileSubscribed(5000),
+        initialValue = emptyList()
+    )
+
+    val filteredDailyPairs: StateFlow<List<DailyAttendancePair>> = filteredRecords.map { records ->
+        repository.groupRecordsIntoDailyPairs(records)
     }.stateIn(
         scope = viewModelScope,
         started = SharingStarted.WhileSubscribed(5000),
@@ -168,30 +203,42 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     fun loginStaff(staff: Staff?) {
         _currentUserRole.value = UserRole.STAFF
         _loggedInStaff.value = staff
+        if (staff != null) {
+            loadStaffTodayStatus(staff)
+        }
+    }
+
+    fun loadStaffTodayStatus(staff: Staff? = null) {
+        val targetStaff = staff ?: _loggedInStaff.value ?: return
+        viewModelScope.launch {
+            val status = repository.getStaffTodayStatus(targetStaff)
+            _staffTodayStatus.value = status
+        }
     }
 
     fun logout() {
         _currentUserRole.value = UserRole.NONE
         _loggedInStaff.value = null
+        _staffTodayStatus.value = null
         resetStates()
     }
 
     fun resetStates() {
         _registerState.value = EnrollUiState.Idle
-        _kioskState.value = KioskAttendanceResult.Idle
+        _kioskState.value = KioskIdentificationState.Idle
     }
 
     fun selectStaffForProfile(staff: Staff) {
         _selectedStaff.value = staff
         viewModelScope.launch {
-            repository.getRecordsForStaff(staff.id).collect { records ->
-                _selectedStaffRecords.value = records
+            repository.getRecordsForStaff(staff.id).collect {
+                _selectedStaffRecords.value = it
             }
         }
     }
 
     /**
-     * Registers a new staff member. Face enrolment is strictly REQUIRED.
+     * ADMIN: Register new Staff member with mandatory face embedding
      */
     fun registerStaff(
         name: String,
@@ -201,7 +248,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         photoBitmap: Bitmap?
     ) {
         if (name.isBlank() || employeeId.isBlank() || username.isBlank() || pass.isBlank()) {
-            _registerState.value = EnrollUiState.Error("Full Name, Employee ID, Username, and Password are all required.")
+            _registerState.value = EnrollUiState.Error("Please fill in all staff details (Name, Employee ID, Username, Password).")
             return
         }
 
@@ -213,17 +260,13 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         _registerState.value = EnrollUiState.Processing
         viewModelScope.launch {
             try {
-                // 1. Detect and crop face
                 val croppedFace = faceDetectorHelper.cropPrimaryFace(photoBitmap)
                 if (croppedFace == null) {
                     _registerState.value = EnrollUiState.Error("No clear face detected in selfie. Ensure good lighting and look directly into the camera.")
                     return@launch
                 }
 
-                // 2. Generate 192-d facial embedding
                 val embedding = faceNetHelper.getFaceEmbedding(croppedFace)
-
-                // 3. Save staff record in Room
                 val result = repository.registerStaff(name, employeeId, username, pass, embedding, photoBitmap)
                 if (result.isSuccess) {
                     _registerState.value = EnrollUiState.Success(result.getOrThrow())
@@ -237,26 +280,46 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     /**
-     * KIOSK: 1:N Face Identification Attendance
+     * KIOSK STEP 1: Identify Staff via 1:N Facial Match
      */
-    fun markKioskAttendance(selfieBitmap: Bitmap) {
-        _kioskState.value = KioskAttendanceResult.Processing
+    fun identifyKioskStaff(selfieBitmap: Bitmap) {
+        _kioskState.value = KioskIdentificationState.Processing
         viewModelScope.launch {
             try {
-                val location = locationHelper.getCurrentLocation()
-                val result = repository.identifyAndMarkAttendance(selfieBitmap, location)
+                val result = repository.identifyStaffMember(selfieBitmap)
                 _kioskState.value = result
             } catch (e: Exception) {
-                _kioskState.value = KioskAttendanceResult.Error(e.localizedMessage ?: "Failed to mark attendance")
+                _kioskState.value = KioskIdentificationState.Error(e.localizedMessage ?: "Failed to identify face")
             }
         }
     }
 
-    fun resetKioskAttendance() {
-        _kioskState.value = KioskAttendanceResult.Idle
+    /**
+     * KIOSK STEP 2: Record Check In or Check Out for Identified Staff
+     */
+    fun recordKioskAction(staff: Staff, actionType: String, selfieBitmap: Bitmap, matchPercentage: Int = 95) {
+        _kioskState.value = KioskIdentificationState.Processing
+        viewModelScope.launch {
+            try {
+                val location = locationHelper.getCurrentLocation()
+                val result = repository.recordAttendanceAction(staff, actionType, selfieBitmap, location, matchPercentage)
+                _kioskState.value = result
+            } catch (e: Exception) {
+                _kioskState.value = KioskIdentificationState.Error(e.localizedMessage ?: "Failed to record attendance")
+            }
+        }
     }
 
-    // FILTER HELPERS
+    // Legacy auto-action wrapper
+    fun markKioskAttendance(selfieBitmap: Bitmap) {
+        identifyKioskStaff(selfieBitmap)
+    }
+
+    fun resetKioskAttendance() {
+        _kioskState.value = KioskIdentificationState.Idle
+    }
+
+    // FILTER HELPERS FOR ATTENDANCE RECORDS
     fun setStaffFilter(id: Long?) {
         filterStaffId.value = id
     }
@@ -271,10 +334,14 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         filterDateTo.value = to
     }
 
-    fun setTimeRangeFilter(from: String?, to: String?) {
+    fun setTimeFilter(from: String?, to: String?, eventType: String = "EITHER") {
         filterTimeFrom.value = from
         filterTimeTo.value = to
+        filterEventType.value = eventType
     }
+
+    fun setTimeRangeFilter(from: String?, to: String?, eventType: String = "EITHER") =
+        setTimeFilter(from, to, eventType)
 
     fun clearAllFilters() {
         filterStaffId.value = null
@@ -282,16 +349,22 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         filterDateTo.value = null
         filterTimeFrom.value = null
         filterTimeTo.value = null
+        filterEventType.value = "EITHER"
     }
 
-    // AI ASSISTANT METHODS
+    // AI ASSISTANT ACTIONS
     fun askAiAssistant(question: String) {
         if (question.isBlank()) return
         _isAiQueryLoading.value = true
         viewModelScope.launch {
-            val result = repository.queryAiAttendance(question)
-            _aiQueryState.value = result
-            _isAiQueryLoading.value = false
+            try {
+                val result = repository.queryAiAttendance(question)
+                _aiQueryState.value = result
+            } catch (e: Exception) {
+                // Heuristic error object
+            } finally {
+                _isAiQueryLoading.value = false
+            }
         }
     }
 
@@ -302,9 +375,13 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     fun generateDailySummary() {
         _isSummaryLoading.value = true
         viewModelScope.launch {
-            val result = repository.generateDailySummary()
-            _dailySummaryState.value = result
-            _isSummaryLoading.value = false
+            try {
+                val summary = repository.generateDailySummary()
+                _dailySummaryState.value = summary
+            } catch (_: Exception) {
+            } finally {
+                _isSummaryLoading.value = false
+            }
         }
     }
 

@@ -18,7 +18,13 @@ interface AttendanceDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertRecord(record: AttendanceRecord): Long
 
-    @Query("SELECT COUNT(*) FROM attendance_records WHERE timestamp >= :startOfDay")
+    @Update
+    suspend fun updateRecord(record: AttendanceRecord)
+
+    @Query("SELECT * FROM attendance_records WHERE id = :id LIMIT 1")
+    suspend fun getRecordByIdSync(id: Long): AttendanceRecord?
+
+    @Query("SELECT COUNT(*) FROM attendance_records WHERE timestamp >= :startOfDay AND type = 'CHECK_IN'")
     fun getTodayAttendanceCount(startOfDay: Long): Flow<Int>
 
     @Query("SELECT * FROM attendance_records ORDER BY timestamp DESC")
@@ -29,4 +35,13 @@ interface AttendanceDao {
 
     @Query("SELECT * FROM attendance_records WHERE timestamp >= :startOfDay ORDER BY timestamp DESC")
     suspend fun getTodayRecordsSync(startOfDay: Long): List<AttendanceRecord>
+
+    @Query("SELECT * FROM attendance_records WHERE staffId = :staffId AND timestamp >= :startOfDay ORDER BY timestamp ASC")
+    suspend fun getTodayRecordsForStaffSync(staffId: Long, startOfDay: Long): List<AttendanceRecord>
+
+    @Query("SELECT * FROM attendance_records WHERE staffId = :staffId AND timestamp >= :startOfDay AND type = 'CHECK_IN' ORDER BY timestamp DESC LIMIT 1")
+    suspend fun getLatestCheckInForStaffTodaySync(staffId: Long, startOfDay: Long): AttendanceRecord?
+
+    @Query("SELECT * FROM attendance_records WHERE staffId = :staffId AND timestamp >= :startOfDay AND type = 'CHECK_OUT' ORDER BY timestamp DESC LIMIT 1")
+    suspend fun getLatestCheckOutForStaffTodaySync(staffId: Long, startOfDay: Long): AttendanceRecord?
 }
