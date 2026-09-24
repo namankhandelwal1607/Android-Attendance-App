@@ -122,6 +122,14 @@ fun StaffProfileScreen(
                             color = PrimaryBlue,
                             fontWeight = FontWeight.Medium
                         )
+                        if (staff.username.isNotBlank()) {
+                            Spacer(modifier = Modifier.height(3.dp))
+                            Text(
+                                text = "Username: ${staff.username}",
+                                fontSize = 12.sp,
+                                color = Slate600
+                            )
+                        }
                         Spacer(modifier = Modifier.height(3.dp))
                         val enrolledDateStr = SimpleDateFormat("dd MMM yyyy", Locale.getDefault()).format(Date(staff.enrolledAt))
                         Text(

@@ -20,4 +20,13 @@ interface AttendanceDao {
 
     @Query("SELECT COUNT(*) FROM attendance_records WHERE timestamp >= :startOfDay")
     fun getTodayAttendanceCount(startOfDay: Long): Flow<Int>
+
+    @Query("SELECT * FROM attendance_records ORDER BY timestamp DESC")
+    suspend fun getAllRecordsSync(): List<AttendanceRecord>
+
+    @Query("SELECT * FROM attendance_records WHERE staffId = :staffId ORDER BY timestamp DESC")
+    suspend fun getRecordsForStaffSync(staffId: Long): List<AttendanceRecord>
+
+    @Query("SELECT * FROM attendance_records WHERE timestamp >= :startOfDay ORDER BY timestamp DESC")
+    suspend fun getTodayRecordsSync(startOfDay: Long): List<AttendanceRecord>
 }

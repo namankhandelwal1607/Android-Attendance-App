@@ -9,6 +9,9 @@ interface StaffDao {
     @Query("SELECT * FROM staff ORDER BY name ASC")
     fun getAllStaff(): Flow<List<Staff>>
 
+    @Query("SELECT * FROM staff ORDER BY name ASC")
+    suspend fun getAllStaffSync(): List<Staff>
+
     @Query("SELECT * FROM staff WHERE id = :id")
     suspend fun getStaffById(id: Long): Staff?
 

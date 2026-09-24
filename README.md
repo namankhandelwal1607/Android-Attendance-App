@@ -1,126 +1,191 @@
-# Smart Attendance App — Selfie Face Recognition & Geolocation
+# Smart Attendance App — 1:N Facial Kiosk, Admin Portal & Groq AI Assistant
 
-An Android attendance system built with **Kotlin** and **Jetpack Compose**, featuring on-device **Face Recognition** using TensorFlow Lite & Google ML Kit, **CameraX** live selfie capture, **GPS Geolocation** tracking, and local **Room SQLite** persistence.
+An enterprise-ready Android attendance system built with **Kotlin** and **Jetpack Compose**, featuring on-device **1:N Face Recognition** using TensorFlow Lite & Google ML Kit, **CameraX** live selfie capture, **GPS Geolocation** verification, local **Room SQLite** persistence, and an intelligent **Groq Llama-3.3 AI Assistant** for natural-language queries and executive summaries.
 
 ---
 
-## 📱 Features
+## 📱 Core Features & Flow
 
-- **Role-based Access**: Clean login portal for **Admin** and **Staff** with instant role switching.
-- **Staff Management (Admin)**:
-  - Add staff members with Full Name and unique Employee ID.
-  - Live camera selfie capture with an oval face-alignment guide.
-  - Automatic face detection and extraction of 192-dimensional embeddings via MobileFaceNet.
-  - View staff directory with search filtering and profile overview.
-  - View detailed staff profiles with full attendance history, check-in timestamps, GPS location, and match confidence scores.
-- **Attendance Verification (Staff)**:
-  - Select staff profile or search by Employee ID.
-  - Front-camera selfie capture with real-time face detection.
-  - On-device 1:1 face verification against the enrolled face embedding using **Cosine Similarity**.
-  - **Threshold Security**: Attendance is only marked if the face similarity meets or exceeds **70%**.
-  - Automatically records **exact timestamp**, **selfie photo**, and **GPS location** (latitude, longitude, and reverse-geocoded readable address).
-- **100% Offline & Private**: Zero external cloud API calls or paid subscriptions required; all ML inference and data storage happen locally on-device.
+1. **Clean Initial State & Role-Based Access**:
+   - On a fresh installation, **zero pre-seeded staff exist**. Only one seeded Admin account exists:
+     - **Username**: `admin`
+     - **Password**: `admin123`
+   - All staff members must be explicitly registered and enrolled by an Admin.
+
+2. **Admin "Register Staff" with Mandatory Facial Enrolment**:
+   - Admin registers each employee with **Full Name** and **Employee ID**.
+   - Admin sets a password manually or taps **Auto-Generate** (e.g., `username = alice`, `password = 6-digit random code`) with credentials clearly displayed to hand to the employee.
+   - **Mandatory Face Enrolment**: Requires taking a front-camera selfie with an oval face-alignment guide. The app detects the face, normalizes it, and extracts a 192-dimensional embedding via MobileFaceNet before saving. Staff cannot be saved without an enrolled face.
+
+3. **Kiosk "Mark Attendance" (No Login Required)**:
+   - Available directly on the landing screen via a prominent **"📷 Mark Attendance (Face Kiosk)"** button.
+   - Any staff member walks up to the kiosk, taps the button, and faces the camera.
+   - **True 1:N Face Identification**: The system computes on-device cosine similarity of the captured selfie against **all registered staff** simultaneously.
+   - **Threshold Security (≥ 0.70)**: If the highest similarity is $\ge 70\%$, the staff member is automatically identified and their attendance is marked with GPS coordinates, reverse-geocoded address, and timestamp.
+   - If no staff member matches $\ge 70\%$, an explicit error is displayed: *"Face not recognized — please contact Admin"*, and no record is logged.
+
+4. **Staff Portal (Self-Scoped & Read-Only)**:
+   - Staff sign in using their registered username/Employee ID and password.
+   - Purely self-scoped: staff view their own photo, Employee ID, check-in count, and read-only attendance history.
+   - Zero access to other employees' records, and no enrolment/administrative capabilities.
+
+5. **Admin Dashboard & Combinable Filters**:
+   - **All Staff Summary**: Total registered staff, per-staff check-in counts, and latest check-in timestamps.
+   - **Attendance Records Tab**: Filterable by:
+     - Specific Staff member (or all staff)
+     - Single Date or Date Range (Today, Last 7 Days, Custom range)
+     - Time-of-day window (e.g., 9:00 AM – 10:00 AM)
+     - All filters are dynamically combinable with a 1-tap "Clear All" reset.
+
+6. **AI Admin Assistant (Groq Cloud)**:
+   - Natural language queries (e.g. *"Show me who was late today"*, *"Who checked in between 9 and 10 AM?"*, *"Did Alice check in this week?"*).
+   - Instant executive **Daily Attendance Summary & Anomaly Report** (punctuality, late arrivals, missing check-ins).
+   - Offline heuristic fallback ensures the app remains operational even without internet connectivity.
+
+---
+
+## 🔑 Demo Credentials
+
+| Role | Username | Password | Notes |
+| :--- | :--- | :--- | :--- |
+| **Admin** | `admin` | `admin123` | Full administrative access to dashboard, staff registration, and AI assistant. |
+| **Staff** | *Created by Admin* | *Set or generated at registration* | Read-only self-scoped portal. Can also log in using their Employee ID. |
+
+---
+
+## 🎬 4-Step End-to-End Demo Script
+
+Follow this 4-step script to test the entire system end-to-end:
+
+### Step 1: Register a Staff Member as Admin
+1. Open the app and log in with Admin credentials (`admin` / `admin123`).
+2. On the **All Staff** tab, tap the **"+ Register Staff"** button.
+3. Enter:
+   - **Full Name**: `Alice Smith`
+   - **Employee ID**: `EMP-201`
+4. Tap **"Auto-Generate"** to create a username (`alice`) and a 6-digit password (note them down).
+5. Tap **"Open Camera & Capture Face"** and capture a selfie within the oval guide.
+6. Tap **"Register & Enrol Staff"**. Alice is now registered with her facial embedding stored in Room SQLite.
+
+### Step 2: Mark Attendance via Kiosk (No Login)
+1. Log out from the Admin portal to return to the landing screen.
+2. Tap the prominent blue **"Mark Attendance (Face Kiosk)"** button (no login needed).
+3. Face the front camera and tap **"Identify & Mark Attendance"**.
+4. The system runs 1:N cosine similarity against all enrolled staff, identifies **Alice Smith** with high confidence (e.g., 90%+ match), and records her attendance along with current GPS coordinates and street address.
+
+### Step 3: Verify Staff Read-Only History
+1. Return to the landing screen.
+2. Under "Sign In to Portal", enter Alice's credentials (`alice` and her 6-digit password).
+3. Alice's **"My Attendance"** screen opens, displaying her profile, Employee ID `EMP-201`, and the attendance record just marked in Step 2.
+4. Alice cannot see any other employee's records or perform administrative actions.
+5. Tap **"Log Out"** in the top bar.
+
+### Step 4: Admin Records Filter & AI Assistant
+1. Log back in as Admin (`admin` / `admin123`).
+2. Go to the **Records** tab $\rightarrow$ tap **"Filter Attendance Records"** $\rightarrow$ select `Alice Smith` to view Alice's filtered attendance.
+3. Switch to the **AI Assistant** tab:
+   - Tap **"Generate Daily Summary"** to get a 3–4 bullet executive briefing.
+   - Or type a query like: *"Show me Alice's attendance"* and tap **Ask AI**. The assistant extracts the filter, queries Room SQLite, and presents the matching records.
+
+---
+
+## 🤖 AI Layer Architecture (Groq & FastMCP)
+
+```
+┌──────────────────────────────────────────────────────────┐
+│                     Jetpack Compose UI                   │
+│   (Admin Dashboard AI Tab / Search / Filter Controls)    │
+└────────────────────────────┬─────────────────────────────┘
+                             │
+                             ▼
+┌──────────────────────────────────────────────────────────┐
+│                  AppViewModel & Repository               │
+└──────────────┬────────────────────────────┬──────────────┘
+               │                            │
+               ▼                            ▼
+┌──────────────────────────────┐ ┌─────────────────────────┐
+│     AttendanceQueryAgent     │ │   Local Room Database   │
+│   (OkHttp 4.12.0 Client)     │ │   (Staff & Attendance)  │
+└──────────────┬───────────────┘ └──────────▲──────────────┘
+               │                            │
+               ▼                            │
+┌──────────────────────────────┐            │
+│       Groq Cloud API         │            │
+│  (llama-3.3-70b-versatile)   │            │
+│  OpenAI-compatible Endpoint  │            │
+└──────────────┬───────────────┘            │
+               │ Parses JSON structured     │
+               │ query filters              │
+               └────────────────────────────┘
+```
+
+### 1. Groq Integration
+- Uses OkHttp to communicate with the Groq OpenAI-compatible Chat Completions endpoint (`https://api.groq.com/openai/v1/chat/completions`).
+- Model: **`llama-3.3-70b-versatile`** with `response_format: { type: "json_object" }` for zero-shot natural language filter parsing.
+- Query Parsing Pipeline:
+  1. The user inputs a query in plain English (e.g. *"Who arrived after 10 AM yesterday?"*).
+  2. Groq extracts structured JSON: `staffName`, `dateFrom`, `dateTo`, `timeFrom`, `timeTo`.
+  3. The app executes this filter directly against Room SQLite database and returns verified records.
+- **Resilient Fallback**: If network is unavailable or Groq is unreachable, the query agent automatically switches to an offline heuristic parser so user queries never crash or fail silently.
+
+### 2. API Key Configuration
+The Groq API key is read at compile time from `local.properties` into `BuildConfig` and is **never committed to version control**:
+```properties
+# In local.properties (gitignored)
+GROQ_API_KEY=gsk_your_groq_api_key_here
+```
+In `app/build.gradle.kts`:
+```kotlin
+buildConfigField("String", "GROQ_API_KEY", "\"$groqApiKey\"")
+```
+
+### 3. FastMCP Server Stub (`mcp_server/attendance_mcp.py`)
+For external AI agent integrations (such as Anthropic Claude or custom MCP-compatible AI systems), a FastMCP server is provided under `mcp_server/attendance_mcp.py`.
+- **Tools exposed**:
+  - `get_staff()`: Retrieves registered staff members.
+  - `get_attendance(staff_id, date)`: Retrieves attendance records.
+  - `query_attendance_by_filter(staff_id, date_from, date_to, time_from, time_to)`: Runs combinable filters matching the Room SQLite data model.
+- Run using:
+  ```bash
+  cd mcp_server
+  pip install fastmcp
+  python attendance_mcp.py
+  ```
 
 ---
 
 ## 🛠️ Architecture & Tech Stack
 
-### Architecture: MVVM (Model-View-ViewModel) + Clean Architecture
-- **UI Layer**: Jetpack Compose with Material 3, Navigation Compose, and reactive StateFlow streams.
-- **Domain & Repository Layer**: Kotlin Coroutines for non-blocking asynchronous operations.
-- **Data Layer**: Room Database (SQLite) + private internal app storage for selfie images.
-
-### Key Libraries & Components
-
-| Component | Technology | Rationale |
+| Component | Technology | Description |
 | :--- | :--- | :--- |
-| **Language & UI** | Kotlin 1.9.24 + Jetpack Compose (Material 3) | Modern declarative UI with reactive state management. |
-| **Camera** | AndroidX CameraX (`1.3.3`) | Official Android camera API with seamless lifecycle integration and front/back lens switching. |
-| **Face Detection** | Google ML Kit Face Detection (`16.1.6`) | Fast, accurate on-device face bounding box detection and alignment. |
-| **Face Recognition** | TensorFlow Lite (`2.14.0`) + `mobilefacenet.tflite` | Generates 192-d L2-normalized embeddings, compared via Cosine Similarity. |
-| **Database** | AndroidX Room (`2.6.1`) | Type-safe local SQLite persistence for staff and attendance records. |
-| **Geolocation** | Google Play Services Location (`21.2.0`) | High-accuracy GPS coordinates (`FusedLocationProviderClient`) + Geocoder for street addresses. |
-| **Image Loading** | Coil Compose (`2.6.0`) | Smooth, memory-efficient rendering of captured selfie photos. |
+| **Language & UI** | Kotlin 1.9.24 + Jetpack Compose (Material 3) | Declarative reactive UI with StateFlow and Navigation Compose. |
+| **Camera** | AndroidX CameraX (`1.3.3`) | Lifecycle-aware front-facing camera selfie capture. |
+| **Face Detection** | Google ML Kit Face Detection (`16.1.6`) | Fast bounding-box detection, face centering, and validation. |
+| **Face Recognition** | TensorFlow Lite (`2.14.0`) + MobileFaceNet | 192-d L2-normalized face embeddings compared via 1:N Cosine Similarity ($\ge 0.70$). |
+| **Database** | AndroidX Room (`2.6.1`) | Local SQLite persistence with schema migrations. |
+| **Geolocation** | Google Play Services Location (`21.2.0`) | GPS coordinates (`FusedLocationProviderClient`) + Geocoder address lookup. |
+| **AI Layer** | Groq Cloud (`llama-3.3-70b-versatile`) + OkHttp | Natural-language query translation and automated daily executive summaries. |
+| **Image Loading** | Coil Compose (`2.6.0`) | High-performance image loading for selfie thumbnails and enrolled photos. |
 
 ---
 
-## 🚀 How to Run the App
+## 🚀 Installation & Running
 
 ### Option A: Install Pre-built APK via ADB (Quickest)
-
-Connect your Android device via USB with USB Debugging enabled, then run:
-
+Connect your Android phone via USB with USB Debugging enabled, then run:
 ```bash
-adb install AttendanceApp.apk
+adb install -r AttendanceApp.apk
+```
+Launch the app:
+```bash
+adb shell am start -n com.attendance.app/.MainActivity
 ```
 
-*(The APK is located in the root directory: `AttendanceApp.apk` or in `app/build/outputs/apk/debug/app-debug.apk`)*
+### Option B: Build from Source
+```bash
+# Build debug APK
+./gradlew assembleDebug
 
-### Option B: Build and Run from Source
-
-1. Clone or open the repository in **Android Studio Hedgehog / Iguana / Jellyfish** (or later).
-2. Ensure you have Android SDK 34 installed.
-3. Build the project using Gradle:
-   ```bash
-   ./gradlew assembleDebug
-   ```
-4. Run directly on an attached device or emulator with camera support.
-
----
-
-## 🔑 Demo Credentials & Quick Test Guide
-
-### 1. Login Accounts & Seeded Demo Data
-
-The app includes a dedicated login screen with Username/Employee-ID and Password authentication, verified locally against Room SQLite and fallback demo credentials.
-
-#### Pre-loaded Accounts:
-
-| Role | Name | Employee ID | Username | Password | Face Status |
-| :--- | :--- | :--- | :--- | :--- | :--- |
-| **Admin** | System Administrator | `ADM-001` | `admin` | `admin123` | Admin Portal Access |
-| **Staff** | Rohan Sharma | `EMP-101` | `rohan` | `rohan123` | Pending Enrolment |
-| **Staff** | Priya Verma | `EMP-102` | `priya` | `priya123` | Pending Enrolment |
-| **Staff** | Aman Gupta | `EMP-103` | `aman` | `aman123` | Pending Enrolment |
-| **Staff** | Sneha Iyer | `EMP-104` | `sneha` | `sneha123` | Pending Enrolment |
-| **Staff** | Karan Mehta | `EMP-105` | `karan` | `karan123` | Pending Enrolment |
-
-> **Important**: Staff faces must be enrolled by an Admin via the Admin Portal before attendance can be marked for them.
-
-#### Generic Fallback Credentials:
-- **Admin**: `username: admin` | `password: admin123` (Routes to Admin Portal)
-- **Staff**: `username: staff` | `password: staff123` (Routes to Staff Attendance)
-
-### 2. Testing Flow
-1. **Admin Login & Face Enrolment**:
-   - Sign in with `username: admin` / `password: admin123`.
-   - In the **Admin Dashboard**, open the **Staff Directory** tab to view the 5 pre-loaded staff members (showing *Face Pending*).
-   - Tap **"+ Enrol Staff"**, enter an employee's details (e.g. `Rohan Sharma` and `EMP-101`), capture a face selfie inside the oval guide, and tap **"Save & Enrol Staff Member"**.
-   - The employee's record is immediately updated with their 192-d facial embedding.
-2. **Staff Login & Attendance Verification**:
-   - Log out from Admin and sign in as `rohan` / `rohan123` (or any enrolled staff member).
-   - The app automatically routes to **Staff Attendance** with Rohan selected.
-   - Tap **"Open Camera & Check In"** $\rightarrow$ look directly into the camera.
-   - **Verification**: The app computes cosine similarity on-device:
-     - **Match (≥70%)**: Confirms attendance with green badge, confidence %, timestamp, and reverse-geocoded GPS street address.
-     - **Mismatch / Unenrolled**: Prompts an error badge without recording attendance.
-3. **Review Attendance Logs**:
-   - Log back in as Admin $\rightarrow$ check **"Who is Present"** tab to see live attendance entries with captured selfies and locations.
-
----
-
-## ⚙️ Assumptions & Limitations
-
-1. **Camera Permissions**: The app requires `CAMERA` and `ACCESS_FINE_LOCATION` permissions. Prompts are displayed in-app when launching camera/attendance features.
-2. **Face Recognition Threshold**: The cosine similarity threshold is set to **0.70** (70%), which provides strong separation between genuine matching faces and different individuals while allowing for normal lighting variations.
-3. **Lighting & Angles**: Like any optical face recognition system, good lighting and facing forward directly towards the camera provides optimal matching accuracy.
-4. **Offline Location**: If GPS is enabled but internet is unavailable, latitude and longitude coordinates are still stored accurately, with fallback coordinate text if the reverse geocoder cannot reach network map servers.
-
----
-
-## 📦 Deliverables Checklist
-
-- [x] Android Studio / Gradle Project with clean MVVM architecture
-- [x] Pre-built debug APK (`AttendanceApp.apk`)
-- [x] Comprehensive README
-- [x] Ready for GitHub submission
+# Install on connected device
+adb install -r app/build/outputs/apk/debug/app-debug.apk
+```

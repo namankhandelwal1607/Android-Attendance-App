@@ -2,12 +2,19 @@ package com.attendance.app.data.repository
 
 import android.content.Context
 import android.graphics.Bitmap
+import com.attendance.app.ai.AgentQueryResult
+import com.attendance.app.ai.AttendanceQueryAgent
+import com.attendance.app.ai.DailySummaryResult
+import com.attendance.app.ai.GroqAttendanceQueryAgent
 import com.attendance.app.data.local.AdminUserDao
 import com.attendance.app.data.local.AttendanceDao
 import com.attendance.app.data.local.StaffDao
 import com.attendance.app.data.model.AdminUser
 import com.attendance.app.data.model.AttendanceRecord
 import com.attendance.app.data.model.Staff
+import com.attendance.app.location.LocationData
+import com.attendance.app.ml.FaceDetectorHelper
+import com.attendance.app.ml.FaceNetModelHelper
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.withContext
@@ -15,10 +22,27 @@ import java.io.File
 import java.io.FileOutputStream
 import java.util.Calendar
 
+sealed class KioskAttendanceResult {
+    object Idle : KioskAttendanceResult()
+    object Processing : KioskAttendanceResult()
+    object NoFaceDetected : KioskAttendanceResult()
+    object NoStaffRegistered : KioskAttendanceResult()
+    data class Unrecognized(val highestScore: Float) : KioskAttendanceResult()
+    data class Success(
+        val staff: Staff,
+        val record: AttendanceRecord,
+        val matchPercentage: Int
+    ) : KioskAttendanceResult()
+    data class Error(val message: String) : KioskAttendanceResult()
+}
+
 class AttendanceRepository(
     private val staffDao: StaffDao,
     private val attendanceDao: AttendanceDao,
     private val adminUserDao: AdminUserDao,
+    private val faceNetHelper: FaceNetModelHelper,
+    private val faceDetectorHelper: FaceDetectorHelper,
+    private val aiAgent: AttendanceQueryAgent = GroqAttendanceQueryAgent(),
     private val context: Context
 ) {
     val allStaff: Flow<List<Staff>> = staffDao.getAllStaff()
@@ -64,105 +88,60 @@ class AttendanceRepository(
         adminUserDao.authenticateAdmin(username, pass) != null
     }
 
-    suspend fun authenticateStaff(query: String, pass: String): Staff? = withContext(Dispatchers.IO) {
-        // Fallback generic staff account
-        if (query.equals("staff", ignoreCase = true) && pass == "staff123") {
-            return@withContext staffDao.getStaffByUsername("staff") ?: Staff(
-                name = "Staff Member",
-                employeeId = "STAFF-000",
-                username = "staff",
-                password = "staff123"
-            )
-        }
-        staffDao.authenticateStaff(query, pass)
+    suspend fun authenticateStaff(usernameOrEmpId: String, pass: String): Staff? = withContext(Dispatchers.IO) {
+        staffDao.authenticateStaff(usernameOrEmpId.trim(), pass.trim())
     }
 
+    /**
+     * Seeds ONLY the Admin account on first launch.
+     * All staff accounts must be registered at runtime by the Admin.
+     */
     suspend fun seedDatabaseIfNeeded() = withContext(Dispatchers.IO) {
-        // 1. Seed Admin user if missing
         if (adminUserDao.getAdminCount() == 0) {
             adminUserDao.insertAdmin(AdminUser(username = "admin", password = "admin123"))
         }
-
-        // 2. Seed 5 demo staff members without enrolled faces
-        val defaultStaff = listOf(
-            Staff(
-                name = "Rohan Sharma",
-                employeeId = "EMP-101",
-                username = "rohan",
-                password = "rohan123",
-                faceEmbedding = null,
-                photoPath = null
-            ),
-            Staff(
-                name = "Priya Verma",
-                employeeId = "EMP-102",
-                username = "priya",
-                password = "priya123",
-                faceEmbedding = null,
-                photoPath = null
-            ),
-            Staff(
-                name = "Aman Gupta",
-                employeeId = "EMP-103",
-                username = "aman",
-                password = "aman123",
-                faceEmbedding = null,
-                photoPath = null
-            ),
-            Staff(
-                name = "Sneha Iyer",
-                employeeId = "EMP-104",
-                username = "sneha",
-                password = "sneha123",
-                faceEmbedding = null,
-                photoPath = null
-            ),
-            Staff(
-                name = "Karan Mehta",
-                employeeId = "EMP-105",
-                username = "karan",
-                password = "karan123",
-                faceEmbedding = null,
-                photoPath = null
-            )
-        )
-
-        for (item in defaultStaff) {
-            val existing = staffDao.getStaffByEmployeeId(item.employeeId)
-            if (existing == null) {
-                staffDao.insertStaff(item)
-            }
-        }
     }
 
-    suspend fun enrollStaff(
+    /**
+     * Registers a new staff member.
+     * Requires Full Name, Employee ID, Username, Password, and Face Enrolment.
+     */
+    suspend fun registerStaff(
         name: String,
         employeeId: String,
+        username: String,
+        pass: String,
         faceEmbedding: FloatArray,
         photoBitmap: Bitmap
     ): Result<Long> = withContext(Dispatchers.IO) {
         try {
-            val existing = staffDao.getStaffByEmployeeId(employeeId.trim())
-            val photoPath = saveBitmapToFile(photoBitmap, "staff_${employeeId.trim()}_${System.currentTimeMillis()}.jpg")
-            val embeddingStr = Staff.embeddingToString(faceEmbedding)
-
-            if (existing != null) {
-                // Update existing record (e.g. seeded user enrolling face for the first time)
-                val updated = existing.copy(
-                    name = if (name.isNotBlank()) name.trim() else existing.name,
-                    faceEmbedding = embeddingStr,
-                    photoPath = photoPath,
-                    enrolledAt = System.currentTimeMillis()
-                )
-                staffDao.updateStaff(updated)
-                return@withContext Result.success(updated.id)
+            if (name.isBlank() || employeeId.isBlank() || username.isBlank() || pass.isBlank()) {
+                return@withContext Result.failure(Exception("All fields (Name, ID, Username, Password) are required"))
             }
 
+            if (faceEmbedding.isEmpty()) {
+                return@withContext Result.failure(Exception("Face enrolment selfie is required to complete registration"))
+            }
+
+            val existingId = staffDao.getStaffByEmployeeId(employeeId.trim())
+            if (existingId != null) {
+                return@withContext Result.failure(Exception("Employee ID '${employeeId.trim()}' is already registered"))
+            }
+
+            val existingUsername = staffDao.getStaffByUsername(username.trim())
+            if (existingUsername != null) {
+                return@withContext Result.failure(Exception("Username '${username.trim()}' is already taken"))
+            }
+
+            val photoPath = saveBitmapToFile(photoBitmap, "staff_${employeeId.trim()}_${System.currentTimeMillis()}.jpg")
             val staff = Staff(
                 name = name.trim(),
                 employeeId = employeeId.trim(),
-                faceEmbedding = embeddingStr,
-                photoPath = photoPath
+                username = username.trim(),
+                password = pass.trim(),
+                faceEmbedding = Staff.embeddingToString(faceEmbedding),
+                photoPath = photoPath,
+                enrolledAt = System.currentTimeMillis()
             )
             val id = staffDao.insertStaff(staff)
             Result.success(id)
@@ -171,32 +150,95 @@ class AttendanceRepository(
         }
     }
 
-    suspend fun recordAttendance(
-        staff: Staff,
+    /**
+     * KIOSK 1:N FACE IDENTIFICATION ATTENDANCE:
+     * NOTE: This changes face matching from 1:1 verification (against a pre-selected user)
+     * to 1:N identification (searching across all registered staff members in Room).
+     * Compares the query embedding against every enrolled staff embedding via Cosine Similarity loop.
+     * If best similarity >= 0.70 threshold, attendance is automatically marked for that person.
+     */
+    suspend fun identifyAndMarkAttendance(
         selfieBitmap: Bitmap,
-        latitude: Double,
-        longitude: Double,
-        address: String,
-        confidence: Float
-    ): Result<Long> = withContext(Dispatchers.IO) {
+        location: LocationData
+    ): KioskAttendanceResult = withContext(Dispatchers.IO) {
         try {
-            val selfiePath = saveBitmapToFile(selfieBitmap, "attendance_${staff.employeeId}_${System.currentTimeMillis()}.jpg")
-            val record = AttendanceRecord(
-                staffId = staff.id,
-                staffName = staff.name,
-                employeeId = staff.employeeId,
-                timestamp = System.currentTimeMillis(),
-                selfiePath = selfiePath,
-                latitude = latitude,
-                longitude = longitude,
-                address = address,
-                confidenceScore = confidence
-            )
-            val id = attendanceDao.insertRecord(record)
-            Result.success(id)
+            // 1. Detect and crop face from live selfie
+            val croppedFace = faceDetectorHelper.cropPrimaryFace(selfieBitmap)
+                ?: return@withContext KioskAttendanceResult.NoFaceDetected
+
+            // 2. Extract 192-d facial embedding
+            val queryEmbedding = faceNetHelper.getFaceEmbedding(croppedFace)
+
+            // 3. Retrieve all registered staff from database
+            val allStaffList = staffDao.getAllStaffSync()
+            if (allStaffList.isEmpty()) {
+                return@withContext KioskAttendanceResult.NoStaffRegistered
+            }
+
+            // 4. 1:N Cosine Similarity comparison over all enrolled staff
+            var bestMatch: Staff? = null
+            var highestScore = -1.0f
+
+            for (staff in allStaffList) {
+                val enrolledEmbedding = staff.getEmbeddingArray()
+                if (enrolledEmbedding.isEmpty()) continue
+
+                val similarity = faceNetHelper.calculateCosineSimilarity(enrolledEmbedding, queryEmbedding)
+                if (similarity > highestScore) {
+                    highestScore = similarity
+                    bestMatch = staff
+                }
+            }
+
+            // 5. Check threshold (0.70)
+            if (bestMatch != null && highestScore >= FaceNetModelHelper.MATCH_THRESHOLD) {
+                val selfiePath = saveBitmapToFile(selfieBitmap, "attendance_${bestMatch.employeeId}_${System.currentTimeMillis()}.jpg")
+                val record = AttendanceRecord(
+                    staffId = bestMatch.id,
+                    staffName = bestMatch.name,
+                    employeeId = bestMatch.employeeId,
+                    timestamp = System.currentTimeMillis(),
+                    selfiePath = selfiePath,
+                    latitude = location.latitude,
+                    longitude = location.longitude,
+                    address = location.readableAddress,
+                    confidenceScore = highestScore
+                )
+                val recordId = attendanceDao.insertRecord(record)
+                val finalRecord = record.copy(id = recordId)
+                val matchPercentage = (highestScore * 100).toInt()
+
+                return@withContext KioskAttendanceResult.Success(bestMatch, finalRecord, matchPercentage)
+            } else {
+                return@withContext KioskAttendanceResult.Unrecognized(highestScore.coerceAtLeast(0f))
+            }
         } catch (e: Exception) {
-            Result.failure(e)
+            return@withContext KioskAttendanceResult.Error(e.localizedMessage ?: "Failed to process face identification")
         }
+    }
+
+    /**
+     * AI Agent: Natural Language Query over Attendance Data
+     */
+    suspend fun queryAiAttendance(question: String): AgentQueryResult = withContext(Dispatchers.IO) {
+        val staffList = staffDao.getAllStaffSync()
+        val records = attendanceDao.getAllRecordsSync()
+        aiAgent.queryAttendance(question, staffList, records)
+    }
+
+    /**
+     * AI Agent: Generate Daily Attendance Executive Summary
+     */
+    suspend fun generateDailySummary(): DailySummaryResult = withContext(Dispatchers.IO) {
+        val calendar = Calendar.getInstance().apply {
+            set(Calendar.HOUR_OF_DAY, 0)
+            set(Calendar.MINUTE, 0)
+            set(Calendar.SECOND, 0)
+            set(Calendar.MILLISECOND, 0)
+        }
+        val staffList = staffDao.getAllStaffSync()
+        val todayRecords = attendanceDao.getTodayRecordsSync(calendar.timeInMillis)
+        aiAgent.generateDailySummary(staffList, todayRecords)
     }
 
     suspend fun deleteStaff(staff: Staff) = withContext(Dispatchers.IO) {

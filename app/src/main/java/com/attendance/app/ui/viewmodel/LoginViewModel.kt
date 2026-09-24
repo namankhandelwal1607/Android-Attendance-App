@@ -76,12 +76,6 @@ class LoginViewModel(application: Application) : AndroidViewModel(application) {
                     return@launch
                 }
 
-                // 2. Check Generic Staff fallback dummy credentials
-                if (u.equals("staff", ignoreCase = true) && p == "staff123") {
-                    _loginResult.value = LoginResult.StaffSuccess(null)
-                    onSuccess(UserRole.STAFF, null)
-                    return@launch
-                }
 
                 // 3. Check seeded/Room staff accounts (by username or employee ID)
                 val matchedStaff = repository.authenticateStaff(u, p)

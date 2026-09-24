@@ -10,7 +10,7 @@ import com.attendance.app.data.model.Staff
 
 @Database(
     entities = [Staff::class, AttendanceRecord::class, AdminUser::class],
-    version = 2,
+    version = 3,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {

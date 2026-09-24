@@ -6,10 +6,11 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import com.attendance.app.ui.screens.LoginScreen
-import com.attendance.app.ui.screens.admin.AddStaffScreen
 import com.attendance.app.ui.screens.admin.AdminDashboardScreen
+import com.attendance.app.ui.screens.admin.RegisterStaffScreen
 import com.attendance.app.ui.screens.admin.StaffProfileScreen
-import com.attendance.app.ui.screens.staff.StaffAttendanceScreen
+import com.attendance.app.ui.screens.kiosk.KioskAttendanceScreen
+import com.attendance.app.ui.screens.staff.StaffHistoryScreen
 import com.attendance.app.ui.viewmodel.AppViewModel
 
 @Composable
@@ -28,7 +29,19 @@ fun AppNavHost(
                     navController.navigate(Screen.AdminDashboard.route)
                 },
                 onNavigateToStaff = {
-                    navController.navigate(Screen.StaffAttendance.route)
+                    navController.navigate(Screen.StaffHistory.route)
+                },
+                onNavigateToKiosk = {
+                    navController.navigate(Screen.KioskAttendance.route)
+                }
+            )
+        }
+
+        composable(Screen.KioskAttendance.route) {
+            KioskAttendanceScreen(
+                viewModel = viewModel,
+                onNavigateBack = {
+                    navController.popBackStack()
                 }
             )
         }
@@ -37,7 +50,7 @@ fun AppNavHost(
             AdminDashboardScreen(
                 viewModel = viewModel,
                 onNavigateToAddStaff = {
-                    navController.navigate(Screen.AddStaff.route)
+                    navController.navigate(Screen.RegisterStaff.route)
                 },
                 onNavigateToStaffProfile = {
                     navController.navigate(Screen.StaffProfile.route)
@@ -51,8 +64,8 @@ fun AppNavHost(
             )
         }
 
-        composable(Screen.AddStaff.route) {
-            AddStaffScreen(
+        composable(Screen.RegisterStaff.route) {
+            RegisterStaffScreen(
                 viewModel = viewModel,
                 onNavigateBack = {
                     navController.popBackStack()
@@ -69,11 +82,14 @@ fun AppNavHost(
             )
         }
 
-        composable(Screen.StaffAttendance.route) {
-            StaffAttendanceScreen(
+        composable(Screen.StaffHistory.route) {
+            StaffHistoryScreen(
                 viewModel = viewModel,
-                onNavigateBack = {
-                    navController.popBackStack()
+                onLogout = {
+                    viewModel.logout()
+                    navController.navigate(Screen.Login.route) {
+                        popUpTo(0)
+                    }
                 }
             )
         }

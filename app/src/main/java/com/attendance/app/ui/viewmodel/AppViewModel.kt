@@ -5,14 +5,15 @@ import android.graphics.Bitmap
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.attendance.app.AttendanceApplication
+import com.attendance.app.ai.AgentQueryResult
+import com.attendance.app.ai.AttendanceQueryAgent
+import com.attendance.app.ai.DailySummaryResult
+import com.attendance.app.ai.GroqAttendanceQueryAgent
+import com.attendance.app.ai.StructuredFilter
 import com.attendance.app.data.model.AttendanceRecord
 import com.attendance.app.data.model.Staff
-import com.attendance.app.ml.FaceNetModelHelper
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.SharingStarted
-import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.stateIn
+import com.attendance.app.data.repository.KioskAttendanceResult
+import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 
 sealed class EnrollUiState {
@@ -20,16 +21,6 @@ sealed class EnrollUiState {
     object Processing : EnrollUiState()
     data class Success(val staffId: Long) : EnrollUiState()
     data class Error(val message: String) : EnrollUiState()
-}
-
-sealed class AttendanceUiState {
-    object Idle : AttendanceUiState()
-    object Processing : AttendanceUiState()
-    data class Success(
-        val record: AttendanceRecord,
-        val matchPercentage: Int
-    ) : AttendanceUiState()
-    data class Error(val message: String) : AttendanceUiState()
 }
 
 enum class UserRole {
@@ -49,6 +40,9 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     // User authentication state
     private val _currentUserRole = MutableStateFlow(UserRole.NONE)
     val currentUserRole: StateFlow<UserRole> = _currentUserRole.asStateFlow()
+
+    private val _loggedInStaff = MutableStateFlow<Staff?>(null)
+    val loggedInStaff: StateFlow<Staff?> = _loggedInStaff.asStateFlow()
 
     // Staff list & stats
     val staffList: StateFlow<List<Staff>> = repository.allStaff.stateIn(
@@ -81,24 +75,85 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         initialValue = emptyList()
     )
 
-    // Enrolment state
-    private val _enrollState = MutableStateFlow<EnrollUiState>(EnrollUiState.Idle)
-    val enrollState: StateFlow<EnrollUiState> = _enrollState.asStateFlow()
+    // Staff self-scoped history records
+    val staffHistoryRecords: StateFlow<List<AttendanceRecord>> = _loggedInStaff.flatMapLatest { staff ->
+        if (staff != null) {
+            repository.getRecordsForStaff(staff.id)
+        } else {
+            flowOf(emptyList())
+        }
+    }.stateIn(
+        scope = viewModelScope,
+        started = SharingStarted.WhileSubscribed(5000),
+        initialValue = emptyList()
+    )
 
-    // Attendance state
-    private val _attendanceState = MutableStateFlow<AttendanceUiState>(AttendanceUiState.Idle)
-    val attendanceState: StateFlow<AttendanceUiState> = _attendanceState.asStateFlow()
+    // Staff Registration state
+    private val _registerState = MutableStateFlow<EnrollUiState>(EnrollUiState.Idle)
+    val registerState: StateFlow<EnrollUiState> = _registerState.asStateFlow()
 
-    // Selected staff for profile view
+    // Kiosk 1:N Attendance state
+    private val _kioskState = MutableStateFlow<KioskAttendanceResult>(KioskAttendanceResult.Idle)
+    val kioskState: StateFlow<KioskAttendanceResult> = _kioskState.asStateFlow()
+
+    // Selected staff for admin profile view
     private val _selectedStaff = MutableStateFlow<Staff?>(null)
     val selectedStaff: StateFlow<Staff?> = _selectedStaff.asStateFlow()
 
     private val _selectedStaffRecords = MutableStateFlow<List<AttendanceRecord>>(emptyList())
     val selectedStaffRecords: StateFlow<List<AttendanceRecord>> = _selectedStaffRecords.asStateFlow()
 
-    // Logged in staff (if authenticated as specific staff member)
-    private val _loggedInStaff = MutableStateFlow<Staff?>(null)
-    val loggedInStaff: StateFlow<Staff?> = _loggedInStaff.asStateFlow()
+    // COMBINABLE FILTERS FOR ADMIN ATTENDANCE RECORDS
+    val filterStaffId = MutableStateFlow<Long?>(null)
+    val filterDateFrom = MutableStateFlow<String?>(null) // YYYY-MM-DD
+    val filterDateTo = MutableStateFlow<String?>(null)   // YYYY-MM-DD
+    val filterTimeFrom = MutableStateFlow<String?>(null) // HH:mm
+    val filterTimeTo = MutableStateFlow<String?>(null)   // HH:mm
+
+    private val filterCriteria = combine(
+        filterStaffId,
+        filterDateFrom,
+        filterDateTo,
+        filterTimeFrom,
+        filterTimeTo
+    ) { staffId, dateFrom, dateTo, timeFrom, timeTo ->
+        StructuredFilter(
+            staffName = null,
+            dateFrom = dateFrom,
+            dateTo = dateTo,
+            timeFrom = timeFrom,
+            timeTo = timeTo
+        ) to staffId
+    }
+
+    val filteredRecords: StateFlow<List<AttendanceRecord>> = combine(
+        allAttendanceRecords,
+        filterCriteria
+    ) { records, (filter, staffId) ->
+        val filteredByAttributes = GroqAttendanceQueryAgent.applyFilter(records, filter)
+        if (staffId != null) {
+            filteredByAttributes.filter { it.staffId == staffId }
+        } else {
+            filteredByAttributes
+        }
+    }.stateIn(
+        scope = viewModelScope,
+        started = SharingStarted.WhileSubscribed(5000),
+        initialValue = emptyList()
+    )
+
+    // AI ASSISTANT & DAILY SUMMARY STATE
+    private val _aiQueryState = MutableStateFlow<AgentQueryResult?>(null)
+    val aiQueryState: StateFlow<AgentQueryResult?> = _aiQueryState.asStateFlow()
+
+    private val _isAiQueryLoading = MutableStateFlow(false)
+    val isAiQueryLoading: StateFlow<Boolean> = _isAiQueryLoading.asStateFlow()
+
+    private val _dailySummaryState = MutableStateFlow<DailySummaryResult?>(null)
+    val dailySummaryState: StateFlow<DailySummaryResult?> = _dailySummaryState.asStateFlow()
+
+    private val _isSummaryLoading = MutableStateFlow(false)
+    val isSummaryLoading: StateFlow<Boolean> = _isSummaryLoading.asStateFlow()
 
     init {
         viewModelScope.launch {
@@ -122,8 +177,8 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun resetStates() {
-        _enrollState.value = EnrollUiState.Idle
-        _attendanceState.value = AttendanceUiState.Idle
+        _registerState.value = EnrollUiState.Idle
+        _kioskState.value = KioskAttendanceResult.Idle
     }
 
     fun selectStaffForProfile(staff: Staff) {
@@ -135,105 +190,121 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    fun enrollStaff(name: String, employeeId: String, photoBitmap: Bitmap) {
-        if (name.isBlank() || employeeId.isBlank()) {
-            _enrollState.value = EnrollUiState.Error("Name and Employee ID cannot be empty")
+    /**
+     * Registers a new staff member. Face enrolment is strictly REQUIRED.
+     */
+    fun registerStaff(
+        name: String,
+        employeeId: String,
+        username: String,
+        pass: String,
+        photoBitmap: Bitmap?
+    ) {
+        if (name.isBlank() || employeeId.isBlank() || username.isBlank() || pass.isBlank()) {
+            _registerState.value = EnrollUiState.Error("Full Name, Employee ID, Username, and Password are all required.")
             return
         }
 
-        _enrollState.value = EnrollUiState.Processing
+        if (photoBitmap == null) {
+            _registerState.value = EnrollUiState.Error("Face selfie is required. Position face inside the oval guide and capture a selfie.")
+            return
+        }
+
+        _registerState.value = EnrollUiState.Processing
         viewModelScope.launch {
             try {
                 // 1. Detect and crop face
                 val croppedFace = faceDetectorHelper.cropPrimaryFace(photoBitmap)
                 if (croppedFace == null) {
-                    _enrollState.value = EnrollUiState.Error("No face detected. Please ensure good lighting and center face in the frame.")
+                    _registerState.value = EnrollUiState.Error("No clear face detected in selfie. Ensure good lighting and look directly into the camera.")
                     return@launch
                 }
 
-                // 2. Generate embedding
+                // 2. Generate 192-d facial embedding
                 val embedding = faceNetHelper.getFaceEmbedding(croppedFace)
 
-                // 3. Save to database
-                val result = repository.enrollStaff(name, employeeId, embedding, photoBitmap)
+                // 3. Save staff record in Room
+                val result = repository.registerStaff(name, employeeId, username, pass, embedding, photoBitmap)
                 if (result.isSuccess) {
-                    _enrollState.value = EnrollUiState.Success(result.getOrThrow())
+                    _registerState.value = EnrollUiState.Success(result.getOrThrow())
                 } else {
-                    _enrollState.value = EnrollUiState.Error(result.exceptionOrNull()?.message ?: "Failed to enroll staff")
+                    _registerState.value = EnrollUiState.Error(result.exceptionOrNull()?.message ?: "Failed to register staff")
                 }
             } catch (e: Exception) {
-                _enrollState.value = EnrollUiState.Error(e.message ?: "An unexpected error occurred")
+                _registerState.value = EnrollUiState.Error(e.localizedMessage ?: "Unexpected error during registration")
             }
         }
     }
 
-    fun markAttendance(staff: Staff, selfieBitmap: Bitmap) {
-        _attendanceState.value = AttendanceUiState.Processing
+    /**
+     * KIOSK: 1:N Face Identification Attendance
+     */
+    fun markKioskAttendance(selfieBitmap: Bitmap) {
+        _kioskState.value = KioskAttendanceResult.Processing
         viewModelScope.launch {
             try {
-                // 1. Detect and crop face from selfie
-                val croppedFace = faceDetectorHelper.cropPrimaryFace(selfieBitmap)
-                if (croppedFace == null) {
-                    _attendanceState.value = AttendanceUiState.Error("No face detected in selfie. Please look directly at the camera.")
-                    return@launch
-                }
-
-                // 2. Generate embedding for current selfie
-                val currentEmbedding = faceNetHelper.getFaceEmbedding(croppedFace)
-                val enrolledEmbedding = staff.getEmbeddingArray()
-
-                if (enrolledEmbedding.isEmpty()) {
-                    _attendanceState.value = AttendanceUiState.Error("No enrolled face found for this staff member.")
-                    return@launch
-                }
-
-                // 3. Compare embeddings
-                val similarity = faceNetHelper.calculateCosineSimilarity(enrolledEmbedding, currentEmbedding)
-                val matchPercentage = (similarity * 100).toInt()
-
-                if (similarity < FaceNetModelHelper.MATCH_THRESHOLD) {
-                    _attendanceState.value = AttendanceUiState.Error(
-                        "Face does not match enrolled profile! Match confidence: $matchPercentage% (Required: ${(FaceNetModelHelper.MATCH_THRESHOLD * 100).toInt()}%)"
-                    )
-                    return@launch
-                }
-
-                // 4. Capture GPS location
                 val location = locationHelper.getCurrentLocation()
-
-                // 5. Store attendance record
-                val result = repository.recordAttendance(
-                    staff = staff,
-                    selfieBitmap = selfieBitmap,
-                    latitude = location.latitude,
-                    longitude = location.longitude,
-                    address = location.readableAddress,
-                    confidence = similarity
-                )
-
-                if (result.isSuccess) {
-                    val recordId = result.getOrThrow()
-                    val record = AttendanceRecord(
-                        id = recordId,
-                        staffId = staff.id,
-                        staffName = staff.name,
-                        employeeId = staff.employeeId,
-                        timestamp = System.currentTimeMillis(),
-                        selfiePath = "",
-                        latitude = location.latitude,
-                        longitude = location.longitude,
-                        address = location.readableAddress,
-                        confidenceScore = similarity
-                    )
-                    _attendanceState.value = AttendanceUiState.Success(record, matchPercentage)
-                } else {
-                    _attendanceState.value = AttendanceUiState.Error(
-                        result.exceptionOrNull()?.message ?: "Failed to save attendance record"
-                    )
-                }
+                val result = repository.identifyAndMarkAttendance(selfieBitmap, location)
+                _kioskState.value = result
             } catch (e: Exception) {
-                _attendanceState.value = AttendanceUiState.Error(e.message ?: "Failed to process face recognition")
+                _kioskState.value = KioskAttendanceResult.Error(e.localizedMessage ?: "Failed to mark attendance")
             }
+        }
+    }
+
+    fun resetKioskAttendance() {
+        _kioskState.value = KioskAttendanceResult.Idle
+    }
+
+    // FILTER HELPERS
+    fun setStaffFilter(id: Long?) {
+        filterStaffId.value = id
+    }
+
+    fun setDateFilter(date: String?) {
+        filterDateFrom.value = date
+        filterDateTo.value = date
+    }
+
+    fun setDateRangeFilter(from: String?, to: String?) {
+        filterDateFrom.value = from
+        filterDateTo.value = to
+    }
+
+    fun setTimeRangeFilter(from: String?, to: String?) {
+        filterTimeFrom.value = from
+        filterTimeTo.value = to
+    }
+
+    fun clearAllFilters() {
+        filterStaffId.value = null
+        filterDateFrom.value = null
+        filterDateTo.value = null
+        filterTimeFrom.value = null
+        filterTimeTo.value = null
+    }
+
+    // AI ASSISTANT METHODS
+    fun askAiAssistant(question: String) {
+        if (question.isBlank()) return
+        _isAiQueryLoading.value = true
+        viewModelScope.launch {
+            val result = repository.queryAiAttendance(question)
+            _aiQueryState.value = result
+            _isAiQueryLoading.value = false
+        }
+    }
+
+    fun clearAiQuery() {
+        _aiQueryState.value = null
+    }
+
+    fun generateDailySummary() {
+        _isSummaryLoading.value = true
+        viewModelScope.launch {
+            val result = repository.generateDailySummary()
+            _dailySummaryState.value = result
+            _isSummaryLoading.value = false
         }
     }
 

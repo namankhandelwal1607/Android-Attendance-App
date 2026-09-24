@@ -1,6 +1,7 @@
 package com.attendance.app
 
 import android.app.Application
+import com.attendance.app.ai.GroqAttendanceQueryAgent
 import com.attendance.app.data.local.AppDatabase
 import com.attendance.app.data.repository.AttendanceRepository
 import com.attendance.app.location.LocationHelper
@@ -35,17 +36,21 @@ class AttendanceApplication : Application() {
         instance = this
 
         database = AppDatabase.getInstance(this)
-        repository = AttendanceRepository(
-            staffDao = database.staffDao(),
-            attendanceDao = database.attendanceDao(),
-            adminUserDao = database.adminUserDao(),
-            context = this
-        )
         faceNetHelper = FaceNetModelHelper(this)
         faceDetectorHelper = FaceDetectorHelper()
         locationHelper = LocationHelper(this)
 
-        // Seed default demo accounts on first launch
+        repository = AttendanceRepository(
+            staffDao = database.staffDao(),
+            attendanceDao = database.attendanceDao(),
+            adminUserDao = database.adminUserDao(),
+            faceNetHelper = faceNetHelper,
+            faceDetectorHelper = faceDetectorHelper,
+            aiAgent = GroqAttendanceQueryAgent(),
+            context = this
+        )
+
+        // Seed ONLY Admin account on first launch
         applicationScope.launch {
             repository.seedDatabaseIfNeeded()
         }

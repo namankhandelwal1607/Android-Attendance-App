@@ -43,7 +43,8 @@ fun LoginScreen(
     appViewModel: AppViewModel,
     loginViewModel: LoginViewModel = viewModel(),
     onNavigateToAdmin: () -> Unit,
-    onNavigateToStaff: () -> Unit
+    onNavigateToStaff: () -> Unit,
+    onNavigateToKiosk: () -> Unit
 ) {
     val username by loginViewModel.username.collectAsStateWithLifecycle()
     val password by loginViewModel.password.collectAsStateWithLifecycle()
@@ -80,12 +81,11 @@ fun LoginScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .verticalScroll(rememberScrollState())
-                .padding(horizontal = 24.dp, vertical = 28.dp),
-            horizontalAlignment = Alignment.Start,
-            verticalArrangement = Arrangement.SpaceBetween
+                .padding(horizontal = 24.dp, vertical = 24.dp),
+            horizontalAlignment = Alignment.Start
         ) {
             // Header Section
-            Column(modifier = Modifier.padding(top = 16.dp)) {
+            Column(modifier = Modifier.padding(top = 8.dp)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Box(
                         modifier = Modifier
@@ -110,32 +110,107 @@ fun LoginScreen(
                             color = Slate900
                         )
                         Text(
-                            text = "Face Recognition & Geolocation",
+                            text = "1:N Face Recognition & GPS Verification",
                             fontSize = 12.sp,
                             color = Slate500
                         )
                     }
                 }
-
-                Spacer(modifier = Modifier.height(32.dp))
-
-                Text(
-                    text = "Sign In",
-                    fontSize = 28.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = Slate900
-                )
-                Spacer(modifier = Modifier.height(6.dp))
-                Text(
-                    text = "Enter your credentials to access the portal",
-                    fontSize = 14.sp,
-                    color = Slate600
-                )
             }
 
-            Spacer(modifier = Modifier.height(28.dp))
+            Spacer(modifier = Modifier.height(24.dp))
 
-            // Form Section
+            // KIOSK ATTENDANCE CARD (NO LOGIN REQUIRED)
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(16.dp),
+                colors = CardDefaults.cardColors(containerColor = PrimaryBlue),
+                elevation = CardDefaults.cardElevation(defaultElevation = 3.dp)
+            ) {
+                Column(
+                    modifier = Modifier.padding(20.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(56.dp)
+                            .clip(CircleShape)
+                            .background(Color.White.copy(alpha = 0.2f)),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.CameraAlt,
+                            contentDescription = null,
+                            tint = Color.White,
+                            modifier = Modifier.size(30.dp)
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.height(12.dp))
+
+                    Text(
+                        text = "Face Attendance Kiosk",
+                        fontSize = 18.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Color.White
+                    )
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(
+                        text = "Instant 1:N Facial Identification • No login required",
+                        fontSize = 12.sp,
+                        color = Color.White.copy(alpha = 0.85f)
+                    )
+
+                    Spacer(modifier = Modifier.height(16.dp))
+
+                    Button(
+                        onClick = onNavigateToKiosk,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(48.dp),
+                        shape = RoundedCornerShape(12.dp),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = Color.White,
+                            contentColor = PrimaryBlue
+                        )
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(
+                                imageVector = Icons.Default.PhotoCamera,
+                                contentDescription = null,
+                                modifier = Modifier.size(20.dp)
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(
+                                text = "Mark Attendance (Face Kiosk)",
+                                fontSize = 15.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(24.dp))
+
+            // Divider: OR SIGN IN
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                HorizontalDivider(modifier = Modifier.weight(1f), color = Slate200)
+                Text(
+                    text = "  OR SIGN IN TO PORTAL  ",
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = Slate400
+                )
+                HorizontalDivider(modifier = Modifier.weight(1f), color = Slate200)
+            }
+
+            Spacer(modifier = Modifier.height(20.dp))
+
+            // Login Form Section
             OutlinedCard(
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(16.dp),
@@ -143,6 +218,20 @@ fun LoginScreen(
                 border = BorderStroke(1.dp, Slate200)
             ) {
                 Column(modifier = Modifier.padding(20.dp)) {
+                    Text(
+                        text = "Portal Login",
+                        fontSize = 16.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Slate900
+                    )
+                    Text(
+                        text = "Admin dashboard or Staff personal history",
+                        fontSize = 12.sp,
+                        color = Slate500
+                    )
+
+                    Spacer(modifier = Modifier.height(16.dp))
+
                     // Username / Employee-ID
                     Text(
                         text = "Username or Employee ID",
@@ -150,11 +239,11 @@ fun LoginScreen(
                         fontWeight = FontWeight.SemiBold,
                         color = Slate700
                     )
-                    Spacer(modifier = Modifier.height(8.dp))
+                    Spacer(modifier = Modifier.height(6.dp))
                     OutlinedTextField(
                         value = username,
                         onValueChange = { loginViewModel.onUsernameChange(it) },
-                        placeholder = { Text("admin, staff, rohan, EMP-101...", fontSize = 14.sp, color = Slate400) },
+                        placeholder = { Text("admin or your staff username/ID", fontSize = 14.sp, color = Slate400) },
                         leadingIcon = {
                             Icon(
                                 imageVector = Icons.Default.Person,
@@ -187,7 +276,7 @@ fun LoginScreen(
                         )
                     )
 
-                    Spacer(modifier = Modifier.height(18.dp))
+                    Spacer(modifier = Modifier.height(14.dp))
 
                     // Password
                     Text(
@@ -196,7 +285,7 @@ fun LoginScreen(
                         fontWeight = FontWeight.SemiBold,
                         color = Slate700
                     )
-                    Spacer(modifier = Modifier.height(8.dp))
+                    Spacer(modifier = Modifier.height(6.dp))
                     OutlinedTextField(
                         value = password,
                         onValueChange = { loginViewModel.onPasswordChange(it) },
@@ -243,7 +332,7 @@ fun LoginScreen(
                         exit = fadeOut()
                     ) {
                         if (loginResult is LoginResult.Error) {
-                            Spacer(modifier = Modifier.height(16.dp))
+                            Spacer(modifier = Modifier.height(14.dp))
                             Surface(
                                 modifier = Modifier.fillMaxWidth(),
                                 shape = RoundedCornerShape(10.dp),
@@ -272,7 +361,7 @@ fun LoginScreen(
                         }
                     }
 
-                    Spacer(modifier = Modifier.height(22.dp))
+                    Spacer(modifier = Modifier.height(18.dp))
 
                     // Login Button
                     Button(
@@ -280,7 +369,7 @@ fun LoginScreen(
                         enabled = loginResult !is LoginResult.Loading,
                         modifier = Modifier
                             .fillMaxWidth()
-                            .height(50.dp),
+                            .height(48.dp),
                         shape = RoundedCornerShape(10.dp),
                         colors = ButtonDefaults.buttonColors(containerColor = PrimaryBlue)
                     ) {
@@ -301,7 +390,7 @@ fun LoginScreen(
                 }
             }
 
-            Spacer(modifier = Modifier.height(20.dp))
+            Spacer(modifier = Modifier.height(18.dp))
 
             // Demo Quick Fill Card
             OutlinedCard(
@@ -319,7 +408,7 @@ fun LoginScreen(
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Icon(Icons.Default.Key, contentDescription = null, tint = PrimaryBlue, modifier = Modifier.size(16.dp))
                             Spacer(modifier = Modifier.width(6.dp))
-                            Text("Demo Credentials (Tap to fill)", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = Slate900)
+                            Text("Initial Admin Credentials", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = Slate900)
                         }
                         Text(
                             text = if (showDemoPills) "Hide" else "Show",
@@ -330,84 +419,33 @@ fun LoginScreen(
                     }
 
                     if (showDemoPills) {
-                        Spacer(modifier = Modifier.height(10.dp))
+                        Spacer(modifier = Modifier.height(8.dp))
                         Text(
-                            text = "Admin Portal:",
+                            text = "Only Admin is seeded on fresh install. Tap below to fill:",
                             fontSize = 11.sp,
-                            fontWeight = FontWeight.SemiBold,
                             color = Slate500
                         )
-                        Spacer(modifier = Modifier.height(6.dp))
-                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            DemoCredentialPill(
-                                label = "Admin (admin / admin123)",
-                                isPrimary = true,
-                                onClick = {
-                                    loginViewModel.setCredentials("admin", "admin123")
-                                }
-                            )
-                        }
+                        Spacer(modifier = Modifier.height(8.dp))
+                        DemoCredentialPill(
+                            label = "Admin: admin / admin123",
+                            isPrimary = true,
+                            onClick = {
+                                loginViewModel.setCredentials("admin", "admin123")
+                            }
+                        )
 
                         Spacer(modifier = Modifier.height(10.dp))
                         Text(
-                            text = "Staff Accounts (5 seeded users):",
+                            text = "💡 Staff accounts are created by Admin in Admin Portal > 'Register Staff'. Once registered, staff can sign in using their assigned username or Employee ID.",
                             fontSize = 11.sp,
-                            fontWeight = FontWeight.SemiBold,
-                            color = Slate500
+                            color = Slate500,
+                            lineHeight = 15.sp
                         )
-                        Spacer(modifier = Modifier.height(6.dp))
-                        Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.spacedBy(6.dp)
-                            ) {
-                                DemoCredentialPill(
-                                    label = "Rohan (rohan123)",
-                                    modifier = Modifier.weight(1f),
-                                    onClick = { loginViewModel.setCredentials("rohan", "rohan123") }
-                                )
-                                DemoCredentialPill(
-                                    label = "Priya (priya123)",
-                                    modifier = Modifier.weight(1f),
-                                    onClick = { loginViewModel.setCredentials("priya", "priya123") }
-                                )
-                            }
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.spacedBy(6.dp)
-                            ) {
-                                DemoCredentialPill(
-                                    label = "Aman (aman123)",
-                                    modifier = Modifier.weight(1f),
-                                    onClick = { loginViewModel.setCredentials("aman", "aman123") }
-                                )
-                                DemoCredentialPill(
-                                    label = "Sneha (sneha123)",
-                                    modifier = Modifier.weight(1f),
-                                    onClick = { loginViewModel.setCredentials("sneha", "sneha123") }
-                                )
-                            }
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.spacedBy(6.dp)
-                            ) {
-                                DemoCredentialPill(
-                                    label = "Karan (karan123)",
-                                    modifier = Modifier.weight(1f),
-                                    onClick = { loginViewModel.setCredentials("karan", "karan123") }
-                                )
-                                DemoCredentialPill(
-                                    label = "Generic (staff123)",
-                                    modifier = Modifier.weight(1f),
-                                    onClick = { loginViewModel.setCredentials("staff", "staff123") }
-                                )
-                            }
-                        }
                     }
                 }
             }
 
-            Spacer(modifier = Modifier.height(24.dp))
+            Spacer(modifier = Modifier.height(20.dp))
 
             // Footer Section
             Row(
@@ -433,7 +471,7 @@ fun LoginScreen(
                         )
                         Spacer(modifier = Modifier.width(6.dp))
                         Text(
-                            text = "Local SQLite & On-Device ML",
+                            text = "Local SQLite • FaceNet 1:N ML • Groq AI",
                             fontSize = 11.sp,
                             fontWeight = FontWeight.Medium,
                             color = Slate600
@@ -463,7 +501,7 @@ private fun DemoCredentialPill(
             fontSize = 12.sp,
             fontWeight = if (isPrimary) FontWeight.SemiBold else FontWeight.Normal,
             color = if (isPrimary) PrimaryBlue else Slate700,
-            modifier = Modifier.padding(horizontal = 8.dp, vertical = 6.dp)
+            modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp)
         )
     }
 }
