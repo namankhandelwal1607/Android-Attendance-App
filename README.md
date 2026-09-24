@@ -14,6 +14,42 @@ As required by the Hiring Assignment guidelines:
 
 ---
 
+## 📱 Application Screenshots & User Flows
+
+The following high-resolution screenshots were captured directly on a live physical device (**Motorola Edge 50 Fusion**, Android 14) showcasing the complete end-to-end working experience across both **User (Staff)** and **Admin** portals, the on-device 1:N facial kiosk, and the Groq AI engine.
+
+### 1. 🚀 Onboarding & 1:N Facial Attendance Kiosk
+| Landing / Onboarding | 1:N Facial Kiosk (CameraX) | Expandable Portal Login |
+| :---: | :---: | :---: |
+| <img src="docs/screenshots/01_landing_screen.png" width="250" alt="Landing Screen"/> | <img src="docs/screenshots/03_kiosk_attendance_screen.png" width="250" alt="Face Attendance Kiosk"/> | <img src="docs/screenshots/02_login_card.png" width="250" alt="Portal Login Card"/> |
+| *Forest green theme, shield logo, Face Kiosk shortcut* | *Real-time CameraX preview with oval face alignment* | *Expandable credentials card with quick-fill* |
+
+### 2. 👤 Staff Member Portal (User Flow)
+| Personal Dashboard & Live Clock | Detailed Attendance Profile & History |
+| :---: | :---: |
+| <img src="docs/screenshots/10_staff_user_dashboard.png" width="280" alt="Staff Member Dashboard"/> | <img src="docs/screenshots/09_staff_profile_screen.png" width="280" alt="Staff Attendance Profile"/> |
+| *Personal greeting, bold live clock, concentric ring check-in/out, and real-time stat tiles* | *Days logged, total hours, paired check-in & check-out history with GPS address and thumbnails* |
+
+### 3. 🛡️ Admin Portal & Staff Registration
+| Staff Directory & Real-Time Stats | Register New Staff Member |
+| :---: | :---: |
+| <img src="docs/screenshots/04_admin_staff_tab.png" width="280" alt="Admin Staff Tab"/> | <img src="docs/screenshots/08_register_staff_screen.png" width="280" alt="Register Staff Screen"/> |
+| *Live counters (Registered, Active Today, Total Logged), instant search, and staff cards* | *Name, Employee ID, auto-generated credentials, and facial biometric enrolment guide* |
+
+### 4. 📊 Paired Records & Weekly Calendar Navigation
+| Paired Check-In / Check-Out Records with Date Strip |
+| :---: |
+| <img src="docs/screenshots/05_admin_records_tab.png" width="300" alt="Admin Records Tab"/> |
+| *September 2026 Weekly Date Strip, filter chips, paired records with GPS location tags and total hours worked* |
+
+### 5. 🧠 Groq Cloud AI Assistant (Natural Language & Analytics)
+| Real-Time Daily Executive Summary | 0-Hallucination Query Engine ("Who marked attendance today?") |
+| :---: | :---: |
+| <img src="docs/screenshots/06_ai_assistant_summary.png" width="280" alt="AI Executive Summary"/> | <img src="docs/screenshots/07_ai_query_result.png" width="280" alt="AI Natural Language Query Response"/> |
+| *Instant one-tap breakdown: attendance rate (75%), arrival windows, and punctuality* | *Accurate natural language response verified against local Room SQLite database* |
+
+---
+
 ## 🎨 UI Design System (Forest Green & Soft White Palette)
 
 - **Palette**: Dark Forest Green (`#1B3D33`) as primary brand accent, Soft Off-White (`#F7FAF8`) background, Card White (`#FFFFFF`), and Mint accents (`#D9E8E1`).
@@ -105,12 +141,15 @@ To ensure **0% hallucination** on times, dates, and attendance counts, the AI As
 
 ## 🔑 Demo Credentials
 
-| Role | Username | Password | Notes |
+| Role | Username / ID | Password | Access Scope & Notes |
 | :--- | :--- | :--- | :--- |
-| **Admin** | `admin` | `admin123` | Full administrative dashboard, staff registration, and AI assistant. |
-| **Staff** | *Created by Admin* | *Set or generated at registration* | Self-scoped read-only portal with personal check-in/out and hours. |
+| **Admin** | `admin` | `admin123` | Full administrative control: staff directory, enrollment, paired records, and Groq AI assistant. |
+| **Staff (Lakshya Jain)** | `ucs633` *(or `lakshya`)* | `123` | Personal staff dashboard: live clock, concentric check-in/out button, and personal history. |
+| **Staff (Monish Mathur)** | `ucs648` | `123` | Enrolled staff account with check-in records. |
+| **Staff (Nishit Luhadia)** | `ucc579` | `123` | Enrolled staff account with check-in records. |
+| **Staff (Naman Khandelwal)** | `ucs655` | `123` | Enrolled staff account. |
 
-> **Note**: Kiosk face recognition (**"📷 Mark Attendance (Face Kiosk)"**) does **not** require entering any username or password. Staff simply face the camera to be identified automatically (1:N face matching).
+> **Note**: Facial Attendance Kiosk (**"📷 Mark Attendance (Face Kiosk)"**) does **not** require typing any credentials. Staff members simply stand in front of the camera to be identified automatically (1:N face matching with $\ge 70\%$ cosine similarity).
 
 ---
 
