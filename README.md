@@ -4,9 +4,18 @@ An enterprise-ready Android attendance system built with **Kotlin** and **Jetpac
 
 ---
 
-## 🎨 New UI Redesign (Forest Green & Soft White Palette)
+## 📦 Submission Deliverables
 
-The app features a cohesive, elegant dark forest green design system:
+As required by the Hiring Assignment guidelines:
+1. **GitHub Repository**: [`https://github.com/namankhandelwal1607/Android-Attendance-App`](https://github.com/namankhandelwal1607/Android-Attendance-App)
+2. **Pre-built APK**: `AttendanceApp.apk` (located at project root and committed to the repository)
+3. **Comprehensive README**: Architecture, setup instructions, assumptions & limitations, demo credentials, and test scripts (detailed below)
+4. **AI Pair Programming Conversation Export**: `ai_conversation_export.json` (955 messages capturing the complete end-to-end design, code generation, debugging, and deployment workflow)
+
+---
+
+## 🎨 UI Design System (Forest Green & Soft White Palette)
+
 - **Palette**: Dark Forest Green (`#1B3D33`) as primary brand accent, Soft Off-White (`#F7FAF8`) background, Card White (`#FFFFFF`), and Mint accents (`#D9E8E1`).
 - **Screen 1 — Landing / Onboarding**:
   - Shield + Clock + Checkmark brand logo.
@@ -15,7 +24,7 @@ The app features a cohesive, elegant dark forest green design system:
   - Collapsible portal sign-in card with quick-fill credentials for Admin (`admin` / `admin123`).
 - **Screen 2 — Live Clock & Concentric Ring Check-In / Out**:
   - Greeting header: *"Hey [Staff Name]"*.
-  - Big live clock display (e.g. `09:00 AM`).
+  - Big live digital clock display (`09:00 AM` style).
   - Circular **concentric-ring button** with multi-layer pulsing waves for Check In and Check Out.
   - Three real-time stat tiles: **Check in** time, **Check out** time, and **Total Hrs** worked.
 - **Screen 3 — Weekly Date Strip & Records**:
@@ -24,7 +33,7 @@ The app features a cohesive, elegant dark forest green design system:
   - Material 3 Calendar DatePicker & TimePicker range dialogs.
 - **Pill Bottom Navigation Bar & Centered Floating AI Assistant**:
   - Floating pill navigation bar at the bottom.
-  - Center floating action button (FAB) with chat bubble / robot icon that opens the **Groq AI Assistant Sheet**.
+  - Center floating action button (FAB) with robot/chat icon that opens the **Groq AI Assistant Sheet**.
 
 ---
 
@@ -101,6 +110,8 @@ To ensure **0% hallucination** on times, dates, and attendance counts, the AI As
 | **Admin** | `admin` | `admin123` | Full administrative dashboard, staff registration, and AI assistant. |
 | **Staff** | *Created by Admin* | *Set or generated at registration* | Self-scoped read-only portal with personal check-in/out and hours. |
 
+> **Note**: Kiosk face recognition (**"📷 Mark Attendance (Face Kiosk)"**) does **not** require entering any username or password. Staff simply face the camera to be identified automatically (1:N face matching).
+
 ---
 
 ## 🎬 End-to-End Demo Script
@@ -148,9 +159,24 @@ To ensure **0% hallucination** on times, dates, and attendance counts, the AI As
 
 ---
 
+## 📌 Assumptions & Limitations
+
+### Assumptions:
+1. **Device Hardware**: The device has a front-facing camera for capturing selfies and face embeddings, and hardware location services (GPS) enabled.
+2. **Face Match Threshold**: A cosine similarity threshold of $\ge 0.70$ (70%) is used for 1:N identification. This provides a balance between false positives (imposters) and false negatives (lighting variations).
+3. **Role Architecture**: The initial state contains a single administrative user (`admin` / `admin123`). Staff accounts cannot be self-registered; they must be enrolled with facial biometrics by an Admin to preserve attendance integrity.
+4. **Offline Resilience**: All core attendance functions (face recognition, kiosk check-in/out, local records view) work completely offline using on-device TFLite models and Room SQLite. Geocoding and Groq AI queries will use an offline heuristic fallback when network connectivity is unavailable.
+
+### Limitations:
+1. **Extreme Lighting & Angles**: On-device MobileFaceNet requires reasonable ambient lighting and relatively direct face orientation ($\pm 15^\circ$ pitch/yaw) within the oval guide for optimal embedding quality.
+2. **Google Play Services**: GPS geolocation and reverse geocoding rely on Google Play Services Location API; emulator instances or custom ROMs without Play Services will fallback to generic coordinates.
+3. **Groq API Rate Limits**: Cloud AI queries depend on Groq API quota. If the API key is rate-limited or unavailable, the query agent transparently switches to the local SQLite filter engine.
+
+---
+
 ## 🚀 Installation & Running
 
-### Option A: Install via ADB on Connected Device
+### Option A: Install via ADB on Connected Device (Quickest)
 ```bash
 adb install -r AttendanceApp.apk
 adb shell am start -n com.attendance.app/.MainActivity
@@ -158,6 +184,9 @@ adb shell am start -n com.attendance.app/.MainActivity
 
 ### Option B: Build from Source
 ```bash
+# Build debug APK
 ./gradlew assembleDebug
-adb install -r app/build/outputs/apk/debug/app-debug.apk
+
+# Install on connected device
+adb install -r AttendanceApp.apk
 ```
